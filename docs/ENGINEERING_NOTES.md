@@ -56,3 +56,12 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - The analyzer is deterministic and fully offline; it does not upload or retain image data.
 - Important: local-neighbour contrast is not a calibrated focus or motion-blur detector. A noisy image can appear detailed, and a naturally smooth scene can score low.
 - This commit adds the tested analysis engine only. The Android capture callback is not yet wired to feed a downsampled image into it, and no post-capture results screen is claimed complete.
+
+## Android post-capture quality analysis v1
+
+- After CameraX saves a JPEG to the local MediaStore, the app reopens that local URI and decodes a bounded thumbnail on a dedicated background executor.
+- The thumbnail is reduced to a 64x64 grayscale sample and passed to the common offline quality analyzer. Full-resolution pixel arrays are not retained by the analyzer.
+- The UI displays an overall heuristic score, exposure clipping, contrast, detail proxy, and reshoot suggestions after capture.
+- Analysis is performed on-device; the original JPEG remains saved in Pictures/LumaCameraAI.
+- Limitations: this is a luminance-statistics heuristic, not a trained image-quality model. The detail metric is local contrast and cannot reliably distinguish true focus from noise, texture, or motion blur. Scores are comparative hints, not objective image-quality grades.
+- Physical-device validation is required for MediaStore URI decoding, orientation behavior, memory use, and responsiveness across device vendors. The current UI shows the most recent capture's result only; persistent history and editing-value recommendations are not yet implemented.
