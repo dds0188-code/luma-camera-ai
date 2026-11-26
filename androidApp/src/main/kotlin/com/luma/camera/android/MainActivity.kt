@@ -128,7 +128,8 @@ private fun LumaCameraApplication() {
     val composition = CompositionAnalyzer.analyze(
         CompositionInput(faceCenterX, faceCenterY, faceArea, horizonTilt.toDouble())
     )
-    val compositionHint = composition.suggestions.firstOrNull() ?: "현재 구도를 유지하며 촬영해 보세요."\n    val guidance = if (faceArea <= 0.0) faceGuidance else {
+    val compositionHint = composition.suggestions.firstOrNull() ?: "현재 구도를 유지하며 촬영해 보세요."
+    val guidance = if (faceArea <= 0.0) faceGuidance else {
         val framingHint = when {
             faceArea < 0.025 -> "피사체가 작아요 · 한 단계 가까이 또는 줌 인"
             faceArea > 0.22 -> "얼굴이 화면을 많이 차지해요 · 한 걸음 뒤로 또는 줌 아웃"
