@@ -41,14 +41,13 @@ object SceneAdvisor {
         val maxZoom = input.maxZoomRatio.coerceAtLeast(1f)
         val currentZoom = input.currentZoomRatio.coerceIn(1f, maxZoom)
         val recommendations = mutableListOf<String>()
-        var targetArea: Double? = null
+        val targetArea = if (input.intent == ShootingIntent.PORTRAIT) 0.16 else null
         val title: String
         val summary: String
 
         when (input.intent) {
             ShootingIntent.PORTRAIT -> {
                 title = "인물 촬영"
-                targetArea = 0.16
                 summary = if (area <= 0.001) "얼굴이 화면에 들어오도록 상반신 또는 전신을 배치하세요."
                     else "얼굴 크기와 시선 방향을 기준으로 인물 프레이밍을 맞춰보세요."
                 if (area > 0.001 && (x < 0.22 || x > 0.78)) {
@@ -78,17 +77,14 @@ object SceneAdvisor {
             }
             ShootingIntent.FOOD -> {
                 title = "음식 촬영"
-                targetArea = 0.28
                 summary = "음식의 질감과 형태가 보이도록 주 피사체 크기를 확보하세요."
-                if (area > 0.001 && area < 0.12) recommendations += "음식이 작게 보여요 · 조금 가까이 다가가거나 줌 인하세요."
-                if (area > 0.001 && area > 0.48) recommendations += "접시가 답답하게 잘리지 않도록 한 걸음 물러나세요."
                 recommendations += "정면·45도·탑뷰를 비교해 음식 높이와 형태가 잘 보이는 각도를 선택하세요."
                 recommendations += "빛이 한쪽에서 들어오도록 하고 접시 주변 여백을 정리하세요."
             }
         }
 
-        if (input.intent != ShootingIntent.LANDSCAPE && area > 0.001) {
-            val target = targetArea ?: 0.2
+        if (input.intent == ShootingIntent.PORTRAIT && area > 0.001) {
+            val target = targetArea ?: 0.16
             val ratio = (currentZoom * sqrt(target / area).toFloat()).coerceIn(1f, maxZoom)
             if (maxZoom > 1.01f && abs(ratio - currentZoom) >= 0.08f) {
                 val direction = if (ratio > currentZoom) "줌 인" else "줌 아웃"
