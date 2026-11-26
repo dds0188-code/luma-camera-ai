@@ -2,6 +2,8 @@ package com.luma.camera
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,8 +13,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -22,17 +28,22 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.luma.camera.analysis.ShootingIntent
 import kotlin.math.abs
 
-private val Background = Color(0xFF0B0D10)
-private val Panel = Color(0xFF171B21)
-private val Accent = Color(0xFF70D6C2)
-private val Muted = Color(0xFF9AA4B2)
+private val Background = Color(0xFF080B0F)
+private val Panel = Color(0xFF141A21)
+private val PanelRaised = Color(0xFF1C252E)
+private val Accent = Color(0xFFB7F36B)
+private val Muted = Color(0xFF98A5B3)
+private val TextMain = Color(0xFFF4F7F9)
+private val Warning = Color(0xFFFFC477)
 
 @Composable
 fun App(
@@ -56,183 +67,224 @@ fun App(
     onApplySuggestedZoom: (Float) -> Unit = {},
     photoQualitySummary: String = "",
     photoQualityLines: List<String> = emptyList(),
-    cameraCapabilitySummary: String = ""
+    cameraCapabilitySummary: String = "",
+    torchEnabled: Boolean = false,
+    onTorchToggle: (Boolean) -> Unit = {}
 ) {
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = Background) {
             Column(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(9.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("LUMA", color = Accent, style = MaterialTheme.typography.labelLarge)
-                        Text("CAMERA AI", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier.size(38.dp).clip(RoundedCornerShape(13.dp)).background(Accent),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("L", color = Color(0xFF10170B), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
                     }
-                    Text("ON-DEVICE ASSIST", color = Muted, style = MaterialTheme.typography.labelSmall)
+                    Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
+                        Text("LUMA CAMERA", color = TextMain, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("온디바이스 촬영 어시스턴트", color = Muted, style = MaterialTheme.typography.labelSmall)
+                    }
+                    Row(
+                        modifier = Modifier.clip(CircleShape).background(Panel).padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(Modifier.size(6.dp).clip(CircleShape).background(Accent))
+                        Text("LOCAL AI", color = Accent, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
                 }
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                     ShootingIntent.values().forEach { intent ->
+                        val selected = shootingIntent == intent
                         Button(
                             onClick = { onShootingIntentChange(intent) },
-                            modifier = Modifier.weight(1f).height(38.dp),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 2.dp, vertical = 0.dp),
+                            modifier = Modifier.height(38.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 17.dp, vertical = 0.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (shootingIntent == intent) Accent else Panel,
-                                contentColor = if (shootingIntent == intent) Color(0xFF07110F) else Color.White
+                                containerColor = if (selected) Accent else Panel,
+                                contentColor = if (selected) Color(0xFF10170B) else Muted
                             ),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = CircleShape
                         ) {
-                            Text(intent.label, style = MaterialTheme.typography.labelMedium)
+                            Text(intent.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
 
                 Box(
-                    modifier = Modifier.fillMaxWidth().weight(1f)
-                        .background(Panel, RoundedCornerShape(24.dp))
+                    modifier = Modifier.fillMaxWidth().weight(1.18f)
+                        .clip(RoundedCornerShape(25.dp)).background(PanelRaised)
                 ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        cameraPreview()
-                        CompositionGrid(Modifier.fillMaxSize())
-                        Column(
-                            modifier = Modifier.align(Alignment.TopStart).padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text("실시간 구도 가이드", color = Accent, style = MaterialTheme.typography.labelLarge)
-                            Text("${shootingIntent.label} · 실시간 촬영 가이드", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                        }
-                        Column(
-                            modifier = Modifier.align(Alignment.TopEnd).padding(14.dp),
-                            horizontalAlignment = Alignment.End
-                        ) {
-                            val levelText = when {
-                                abs(horizonTiltDegrees) < 1.5f -> "수평 양호"
-                                horizonTiltDegrees > 0f -> "오른쪽 기울기"
-                                else -> "왼쪽 기울기"
-                            }
-                            Text(levelText, color = if (abs(horizonTiltDegrees) < 1.5f) Accent else Color(0xFFFFC078))
-                            Text("${"%.1f".format(kotlin.math.abs(horizonTiltDegrees))}°", color = Color.White)
-                        }
-                        Text(
-                            compositionGuidance,
-                            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
-                                .background(Color(0xCC101419)).padding(12.dp),
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelMedium
-                        )
+                    cameraPreview()
+                    CompositionGrid(Modifier.fillMaxSize())
+                    Row(
+                        modifier = Modifier.align(Alignment.TopStart).padding(12.dp)
+                            .clip(CircleShape).background(Color(0x99080B0F)).padding(horizontal = 11.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(Modifier.size(6.dp).clip(CircleShape).background(Color(0xFFFF625F)))
+                        Text("LIVE GUIDE", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     }
+                    Column(
+                        modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)
+                            .clip(RoundedCornerShape(13.dp)).background(Color(0x99080B0F)).padding(horizontal = 10.dp, vertical = 7.dp),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        val levelOk = abs(horizonTiltDegrees) < 1.5f
+                        Text(if (levelOk) "수평 양호" else "수평 조정", color = if (levelOk) Accent else Warning, style = MaterialTheme.typography.labelSmall)
+                        Text("${"%.1f".format(abs(horizonTiltDegrees))}°", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
+                    Text(
+                        compositionGuidance,
+                        modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                            .background(Color(0xD9080B0F)).padding(horizontal = 13.dp, vertical = 11.dp),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 }
 
                 Column(
-                    modifier = Modifier.fillMaxWidth()
-                        .background(Panel, RoundedCornerShape(20.dp)).padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("카메라 설정", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.weight(1f))
-                        Text("기기 지원 범위 적용", color = Accent, style = MaterialTheme.typography.labelSmall)
-                    }
-                    if (adviceSummary.isNotBlank()) {
-                        Text(adviceSummary, color = Accent, style = MaterialTheme.typography.bodySmall)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Panel).padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("촬영 제안", color = TextMain, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(adviceSummary.ifBlank { "장면에 맞는 촬영 구도를 분석합니다." }, color = Muted, style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (suggestedZoomRatio != null) {
+                            Button(
+                                onClick = { onApplySuggestedZoom(suggestedZoomRatio) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF10170B)),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 7.dp),
+                                shape = CircleShape
+                            ) { Text("${"%.1f".format(suggestedZoomRatio)}× 적용", style = MaterialTheme.typography.labelSmall) }
+                        }
                     }
                     adviceLines.take(2).forEach { line ->
-                        Text("• $line", color = Muted, style = MaterialTheme.typography.bodySmall)
+                        Text("· $line", color = Muted, style = MaterialTheme.typography.bodySmall)
                     }
-                    if (suggestedZoomRatio != null) {
-                        Button(
-                            onClick = { onApplySuggestedZoom(suggestedZoomRatio) },
-                            modifier = Modifier.fillMaxWidth().height(40.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF07110F))
-                        ) {
-                            Text("추천 줌 ${"%.1f".format(suggestedZoomRatio)}× 적용")
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Panel).padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("렌즈 · 노출", color = TextMain, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.weight(1f))
+                            Text("기기 지원 범위", color = Accent, style = MaterialTheme.typography.labelSmall)
                         }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("줌  ${"%.1f".format(zoomRatio)}×", color = Color.White, modifier = Modifier.weight(1f))
-                        Text("최대 ${"%.1f".format(maxZoomRatio)}×", color = Muted, style = MaterialTheme.typography.labelSmall)
-                    }
-                    Slider(
-                        value = zoomRatio.coerceIn(1f, maxZoomRatio.coerceAtLeast(1f)),
-                        onValueChange = onZoomChange,
-                        valueRange = 1f..maxZoomRatio.coerceAtLeast(1.01f),
-                        enabled = maxZoomRatio > 1.01f
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("노출 보정  $exposureIndex", color = Color.White, modifier = Modifier.weight(1f))
-                        Text("기기 지원 범위", color = Muted, style = MaterialTheme.typography.labelSmall)
-                    }
-                    if (maxExposureIndex > minExposureIndex) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("줌  ${"%.1f".format(zoomRatio)}×", color = TextMain, modifier = Modifier.weight(1f))
+                            Text("최대 ${"%.1f".format(maxZoomRatio)}×", color = Muted, style = MaterialTheme.typography.labelSmall)
+                        }
                         Slider(
-                            value = exposureIndex.toFloat().coerceIn(minExposureIndex.toFloat(), maxExposureIndex.toFloat()),
-                            onValueChange = { onExposureChange(it.toInt()) },
-                            valueRange = minExposureIndex.toFloat()..maxExposureIndex.toFloat(),
-                            steps = (maxExposureIndex - minExposureIndex - 1).coerceAtLeast(0)
+                            value = zoomRatio.coerceIn(1f, maxZoomRatio.coerceAtLeast(1f)),
+                            onValueChange = onZoomChange,
+                            valueRange = 1f..maxZoomRatio.coerceAtLeast(1.01f),
+                            enabled = maxZoomRatio > 1.01f
                         )
-                    } else {
-                        Text("이 카메라는 노출 보정 조절을 지원하지 않습니다.", color = Muted, style = MaterialTheme.typography.bodySmall)
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Button(
-                            onClick = onCaptureClick,
-                            shape = CircleShape,
-                            colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF07110F)),
-                            modifier = Modifier.height(52.dp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("노출 보정", color = TextMain, modifier = Modifier.weight(1f))
+                            Text(if (exposureIndex > 0) "+$exposureIndex" else exposureIndex.toString(), color = Accent, fontWeight = FontWeight.Bold)
+                        }
+                        if (maxExposureIndex > minExposureIndex) {
+                            Slider(
+                                value = exposureIndex.toFloat().coerceIn(minExposureIndex.toFloat(), maxExposureIndex.toFloat()),
+                                onValueChange = { onExposureChange(it.toInt()) },
+                                valueRange = minExposureIndex.toFloat()..maxExposureIndex.toFloat(),
+                                steps = (maxExposureIndex - minExposureIndex - 1).coerceAtLeast(0)
+                            )
+                        } else {
+                            Text("이 기기에서 노출 보정 범위를 제공하지 않습니다.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("플래시", color = TextMain, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text(if (torchEnabled) "켜짐" else "꺼짐", color = Muted, style = MaterialTheme.typography.labelSmall)
+                            }
+                            Button(
+                                onClick = { onTorchToggle(!torchEnabled) },
+                                enabled = cameraCapabilitySummary.contains("플래시 있음"),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (torchEnabled) Accent else PanelRaised,
+                                    contentColor = if (torchEnabled) Color(0xFF10170B) else TextMain
+                                ),
+                                shape = CircleShape
+                            ) { Text(if (torchEnabled) "켜짐" else "끔") }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("  촬영  ", style = MaterialTheme.typography.titleMedium)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("촬영 준비 완료", color = TextMain, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                Text(captureStatus, color = Muted, style = MaterialTheme.typography.labelSmall)
+                            }
+                            Button(
+                                onClick = onCaptureClick,
+                                modifier = Modifier.size(68.dp),
+                                shape = CircleShape,
+                                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF10170B)),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                            ) {
+                                Box(Modifier.size(50.dp).border(3.dp, Color(0xFF10170B), CircleShape).padding(5.dp).background(Color(0xFF10170B), CircleShape))
+                            }
                         }
                     }
-                    Text(captureStatus, color = Muted, style = MaterialTheme.typography.bodySmall)
-                }
-                if (cameraCapabilitySummary.isNotBlank()) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth()
-                            .background(Panel, RoundedCornerShape(20.dp)).padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text("기기 카메라 지원 범위", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                        Text(cameraCapabilitySummary, color = Muted, style = MaterialTheme.typography.bodySmall)
-                        Text("기기 제조사·카메라 모듈에 따라 지원 항목과 실제 동작이 다를 수 있습니다.", color = Muted, style = MaterialTheme.typography.labelSmall)
+
+                    if (cameraCapabilitySummary.isNotBlank()) {
+                        InfoCard("기기 카메라 정보", cameraCapabilitySummary)
                     }
-                }
-                if (photoQualitySummary.isNotBlank()) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth()
-                            .background(Panel, RoundedCornerShape(20.dp)).padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text("촬영 사진 품질 분석", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                        Text(photoQualitySummary, color = Accent, style = MaterialTheme.typography.bodyMedium)
-                        photoQualityLines.forEach { line ->
-                            Text("• $line", color = Muted, style = MaterialTheme.typography.bodySmall)
+                    if (photoQualitySummary.isNotBlank()) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Panel).padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(7.dp)
+                        ) {
+                            Text("촬영 결과 분석", color = TextMain, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(photoQualitySummary, color = Accent, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                            photoQualityLines.forEach { Text("· $it", color = Muted, style = MaterialTheme.typography.bodySmall) }
+                            Text("디테일 점수는 초점 정확도를 직접 측정한 값이 아닌 참고 지표입니다.", color = Muted, style = MaterialTheme.typography.labelSmall)
                         }
-                        Text("참고용 분석입니다. 디테일 점수는 초점 정확도를 직접 측정한 값이 아닙니다.", color = Muted, style = MaterialTheme.typography.labelSmall)
                     }
+                    Text("사진과 AI 분석은 기본적으로 기기 안에서 처리됩니다.", color = Muted, style = MaterialTheme.typography.labelSmall)
                 }
-                Text(
-                    "사진은 기기에 저장됩니다. 얼굴 및 사진 품질 분석은 기기 내에서 처리됩니다.",
-                    color = Muted,
-                    style = MaterialTheme.typography.bodySmall
-                )
             }
         }
     }
 }
 
 @Composable
+private fun InfoCard(title: String, content: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Panel).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        Text(title, color = TextMain, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Text(content, color = Muted, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
 private fun CompositionGrid(modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {
-        val lineColor = Color.White.copy(alpha = 0.48f)
+        val lineColor = Color.White.copy(alpha = 0.38f)
         val stroke = 1.dp.toPx()
         for (i in 1..2) {
             val x = size.width * i / 3f
