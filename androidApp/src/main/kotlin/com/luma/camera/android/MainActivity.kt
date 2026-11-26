@@ -51,6 +51,9 @@ import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.luma.camera.App
 import com.luma.camera.analysis.CompositionAnalyzer
 import com.luma.camera.analysis.CompositionInput
+import com.luma.camera.analysis.SceneAdviceInput
+import com.luma.camera.analysis.SceneAdvisor
+import com.luma.camera.analysis.ShootingIntent
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -88,6 +91,7 @@ private fun LumaCameraApplication() {
     var faceCenterY by remember { mutableStateOf(0.5) }
     var faceArea by remember { mutableStateOf(0.0) }
     var horizonTilt by remember { mutableStateOf(0f) }
+    var shootingIntent by remember { mutableStateOf(ShootingIntent.PORTRAIT) }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasCameraPermission = granted
@@ -129,6 +133,17 @@ private fun LumaCameraApplication() {
         CompositionInput(faceCenterX, faceCenterY, faceArea, horizonTilt.toDouble())
     )
     val compositionHint = composition.suggestions.firstOrNull() ?: "현재 구도를 유지하며 촬영해 보세요."
+    val sceneAdvice = SceneAdvisor.advise(
+        SceneAdviceInput(
+            intent = shootingIntent,
+            subjectCenterX = faceCenterX,
+            subjectCenterY = faceCenterY,
+            subjectAreaRatio = faceArea,
+            horizonTiltDegrees = horizonTilt.toDouble(),
+            currentZoomRatio = zoomRatio,
+            maxZoomRatio = maxZoomRatio
+        )
+    )
     val guidance = if (faceArea <= 0.0) faceGuidance else {
         val framingHint = when {
             faceArea < 0.025 -> "피사체가 작아요 · 한 단계 가까이 또는 줌 인"
