@@ -21,6 +21,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import android.hardware.camera2.CameraCharacteristics
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
@@ -97,6 +99,7 @@ private fun LumaCameraApplication() {
     var shootingIntent by remember { mutableStateOf(ShootingIntent.PORTRAIT) }
     var photoQualitySummary by remember { mutableStateOf("") }
     var photoQualityLines by remember { mutableStateOf(emptyList<String>()) }
+    var cameraCapabilitySummary by remember { mutableStateOf("카메라 지원 기능 확인 중…") }
     val qualityExecutor = remember { Executors.newSingleThreadExecutor() }
     DisposableEffect(qualityExecutor) { onDispose { qualityExecutor.shutdownNow() } }
 
@@ -184,6 +187,7 @@ private fun LumaCameraApplication() {
         onApplySuggestedZoom = { zoomAction?.invoke(it) },
         photoQualitySummary = photoQualitySummary,
         photoQualityLines = photoQualityLines,
+        cameraCapabilitySummary = cameraCapabilitySummary,
         cameraPreview = {
             if (hasCameraPermission) {
                 CameraPreview(
@@ -198,6 +202,7 @@ private fun LumaCameraApplication() {
                     qualityExecutor = qualityExecutor,
                     onPhotoQualitySummary = { photoQualitySummary = it },
                     onPhotoQualityLines = { photoQualityLines = it },
+                    onCameraCapabilitySummary = { cameraCapabilitySummary = it },
                     onFaceDetected = { x, y, area ->
                         faceCenterX = x; faceCenterY = y; faceArea = area
                         faceGuidance = "얼굴 피사체 감지 · 구도 분석 중"
@@ -224,6 +229,7 @@ private fun CameraPreview(
     qualityExecutor: java.util.concurrent.ExecutorService,
     onPhotoQualitySummary: (String) -> Unit,
     onPhotoQualityLines: (List<String>) -> Unit,
+    onCameraCapabilitySummary: (String) -> Unit,
     onFaceDetected: (Double, Double, Double) -> Unit,
     onFaceLost: () -> Unit
 ) {
@@ -299,6 +305,44 @@ private fun CameraPreview(
                     lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture, analysis
                 )
                 imageCapture = capture
+
+                // Read Camera2 characteristics for the active rear camera. This is inspection only.
+                val camera2Info = Camera2CameraInfo.from(boundCamera.cameraInfo)
+                val isoRange = camera2Info.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)
+                val shutterRange = camera2Info.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
+                val awbModes = camera2Info.getCameraCharacteristic(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES)
+                    ?: intArrayOf(CameraCharacteristics.CONTROL_AWB_MODE_AUTO)
+                val capabilities = camera2Info.getCameraCharacteristic(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
+                    ?: intArrayOf()
+                val manualSensorSupported = capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
+                val awbNames = awbModes.mapNotNull { mode ->
+                    when (mode) {
+                        CameraCharacteristics.CONTROL_AWB_MODE_AUTO -> "자동"
+                        CameraCharacteristics.CONTROL_AWB_MODE_INCANDESCENT -> "백열등"
+                        CameraCharacteristics.CONTROL_AWB_MODE_FLUORESCENT -> "형광등"
+                        CameraCharacteristics.CONTROL_AWB_MODE_WARM_FLUORESCENT -> "온백색 형광등"
+                        CameraCharacteristics.CONTROL_AWB_MODE_DAYLIGHT -> "주광"
+                        CameraCharacteristics.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT -> "흐림"
+                        CameraCharacteristics.CONTROL_AWB_MODE_TWILIGHT -> "황혼"
+                        CameraCharacteristics.CONTROL_AWB_MODE_SHADE -> "그늘"
+                        else -> null
+                    }
+                }.distinct()
+                val isoText = isoRange?.let { "ISO ${it.lower}–${it.upper}" } ?: "ISO 범위 미제공"
+                val shutterText = shutterRange?.let {
+                    "셔터 ${"%.2f".format(it.lower / 1_000_000.0)}–${"%.2f".format(it.upper / 1_000_000.0)} ms"
+                } ?: "셔터 범위 미제공"
+                val manualText = if (manualSensorSupported && isoRange != null && shutterRange != null) {
+                    "수동 ISO·셔터 지원"
+                } else {
+                    "수동 ISO·셔터 미지원 또는 제한"
+                }
+                onCameraCapabilitySummary(
+                    "후면 카메라 · " + (if (boundCamera.cameraInfo.hasFlashUnit()) "플래시 있음" else "플래시 없음") + "\n" +
+                        manualText + " · " + isoText + " · " + shutterText + "\n" +
+                        "화이트밸런스: " + awbNames.joinToString(" · ").ifBlank { "지원 모드 확인 불가" }
+                )
+
                 val zoomState = boundCamera.cameraInfo.zoomState.value
                 val maxZoom = zoomState?.maxZoomRatio ?: 1f
                 val currentZoom = zoomState?.zoomRatio ?: 1f
