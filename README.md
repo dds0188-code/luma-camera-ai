@@ -2,11 +2,10 @@
 
 한국어 기본 UI를 제공하는 오프라인 우선 개인용 AI 카메라 앱입니다.
 
-## 플랫폼
+## 지원 플랫폼
 - Android APK
-- Windows 데스크톱 앱
-- macOS 데스크톱 앱
-- 웹 앱은 개발 범위에서 제외
+- Windows 데스크톱 앱 (MSI)
+- macOS 및 웹 앱은 개발 범위에서 제외
 
 ## 핵심 목표
 - 촬영 전 구도, 촬영 각도, 거리감, 줌/렌즈 선택 가이드
@@ -17,10 +16,9 @@
 - 사진은 기본적으로 기기 밖으로 전송하지 않음
 
 ## 현재 기술 구성
-- 공통 UI: Kotlin Multiplatform + Compose Multiplatform
-- Android 카메라: CameraX 의존성 준비
-- Windows 카메라: Media Foundation 어댑터 구현 예정
-- macOS 카메라: AVFoundation 어댑터 구현 예정
+- 공통 UI/분석 로직: Kotlin Multiplatform + Compose Multiplatform
+- Android 카메라: CameraX
+- Windows 카메라: Windows 네이티브 카메라 연동 구현 예정
 - 영상/기하 분석: OpenCV 도입 검토
 - 온디바이스 추론: LiteRT 또는 ONNX Runtime 검증 후 선정
 
@@ -28,16 +26,16 @@
 - [x] 멀티플랫폼 Gradle 모듈 골격
 - [x] 공통 한국어 다크 UI 초안
 - [x] Android 앱 진입점 및 카메라 권한 선언
-- [x] Android/desktop 타깃 선언
-- [x] Windows/macOS 데스크톱 실행 진입점 및 패키징 설정
-- [x] Android 및 데스크톱 CI 빌드 작업 정의
-- [x] Android CameraX 후면 카메라 실시간 미리보기 연결 (현재 CI 재검증 중)
+- [x] Android/Windows 데스크톱 타깃 선언
+- [x] Windows MSI 패키징 설정
+- [x] Android 및 Windows CI 빌드 작업 정의
+- [x] Android CameraX 후면 카메라 실시간 미리보기 연결
+- [x] 정규화된 피사체 위치/크기와 수평 기울기를 이용한 기본 구도 점수 엔진 및 단위 테스트
 - [ ] 사진 촬영/저장 기능
 - [ ] 실제 카메라 수동 제어
-- [x] 정규화된 피사체 위치/크기와 수평 기울기를 이용한 기본 구도 점수 엔진 및 단위 테스트
 - [ ] 카메라 프레임 기반 자동 피사체 검출 및 온디바이스 AI
 - [ ] 촬영 후 평가 및 보정 추천
-- [ ] APK/Windows MSI/macOS DMG 산출물 및 실기기 검증
+- [ ] APK/Windows MSI 실기기 검증
 
 ## 개발 원칙
 기기가 지원하지 않는 카메라 설정은 노출하지 않습니다. 단일 카메라 영상으로 정확한 물리적 거리나 3D 각도를 확정할 수 없는 경우에는 추정 가이드로 표시합니다. 모델은 라이선스, 오프라인 동작, 기기 성능을 검토한 뒤 포함합니다.
