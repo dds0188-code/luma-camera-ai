@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
+import android.view.Surface
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -120,6 +121,7 @@ private fun CameraPreview(
             }
             val captureUseCase = ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .setTargetRotation(previewView.display?.rotation ?: Surface.ROTATION_0)
                 .build()
             try {
                 cameraProvider.unbindAll()
@@ -139,6 +141,7 @@ private fun CameraPreview(
                         onCaptureStatus("사진 저장 중입니다…")
                     } else {
                         isCapturing = true
+                        activeCapture.targetRotation = previewView.display?.rotation ?: Surface.ROTATION_0
                         onCaptureStatus("사진 촬영 중…")
                         saveCapture(activeCapture, context, mainExecutor,
                             onSaved = { uri ->
@@ -146,7 +149,7 @@ private fun CameraPreview(
                                 onCaptureStatus("저장 완료 · 갤러리에서 확인할 수 있습니다.")
                                 Log.i(TAG, "Photo saved: $uri")
                             },
-                            onError = { message ->
+                            onFailure = { message ->
                                 isCapturing = false
                                 onCaptureStatus("촬영 실패: $message")
                                 Log.e(TAG, "Capture failed: $message")
@@ -178,13 +181,9 @@ private fun saveCapture(
     context: android.content.Context,
     executor: Executor,
     onSaved: (Uri) -> Unit,
-    onError: (String) -> Unit
+    onFailure: (String) -> Unit
 ) {
     val resolver = context.contentResolver
-    if (resolver == null) {
-        onError("저장소에 접근할 수 없습니다.")
-        return
-    }
     val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
     val values = ContentValues().apply {
         put(MediaStore.Images.Media.DISPLAY_NAME, "LUMA_$timestamp.jpg")
@@ -203,7 +202,7 @@ private fun saveCapture(
         override fun onImageSaved(output: ImageCapture.OutputFileResults) {
             val uri = output.savedUri
             if (uri == null) {
-                onError("저장된 사진 위치를 확인할 수 없습니다.")
+                onFailure("저장된 사진 위치를 확인할 수 없습니다.")
                 return
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -214,7 +213,7 @@ private fun saveCapture(
         }
 
         override fun onError(exception: ImageCaptureException) {
-            onError(exception.localizedMessage ?: "사진을 저장하지 못했습니다.")
+            onFailure(exception.localizedMessage ?: "사진을 저장하지 못했습니다.")
         }
     })
 }
