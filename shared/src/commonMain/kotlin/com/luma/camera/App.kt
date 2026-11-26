@@ -26,7 +26,7 @@ private val Accent = Color(0xFF70D6C2)
 private val Muted = Color(0xFF9AA4B2)
 
 @Composable
-fun App() {
+fun App(cameraPreview: @Composable () -> Unit = { PreviewPlaceholder() }) {
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = Background) {
             Column(
@@ -45,12 +45,14 @@ fun App() {
                         .background(Panel, RoundedCornerShape(24.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("카메라 미리보기", color = Color.White, style = MaterialTheme.typography.titleLarge)
-                        Spacer(Modifier.height(8.dp))
-                        Text("카메라 연결 모듈 준비 중", color = Muted)
-                        Spacer(Modifier.height(18.dp))
-                        Text("구도 가이드  ·  수평계  ·  AI 장면 분석", color = Accent)
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        cameraPreview()
+                        Column(
+                            modifier = Modifier.align(Alignment.BottomStart).padding(16.dp),
+                            horizontalAlignment = Alignment.Start
+                        ) {
+                            Text("구도 가이드  ·  수평계  ·  AI 장면 분석", color = Accent)
+                        }
                     }
                 }
                 Column(
@@ -79,5 +81,15 @@ private fun InfoTile(modifier: Modifier, title: String, detail: String) {
     ) {
         Text(title, color = Accent, style = MaterialTheme.typography.labelMedium)
         Text(detail, color = Color.White, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+
+@Composable
+private fun PreviewPlaceholder() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("카메라 미리보기", color = Color.White, style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(8.dp))
+        Text("카메라 연결 모듈 준비 중", color = Muted)
     }
 }
