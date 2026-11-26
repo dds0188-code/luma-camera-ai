@@ -323,7 +323,7 @@ private fun CameraPreview(
                 val capabilities = camera2Info.getCameraCharacteristic(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
                     ?: intArrayOf()
                 val manualSensorSupported = capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
-                val awbNames = awbModes.mapNotNull { mode ->
+                val awbNames = awbModes.toList().mapNotNull { mode ->
                     when (mode) {
                         CameraCharacteristics.CONTROL_AWB_MODE_AUTO -> "자동"
                         CameraCharacteristics.CONTROL_AWB_MODE_INCANDESCENT -> "백열등"
