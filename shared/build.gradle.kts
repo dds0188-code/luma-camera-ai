@@ -48,7 +48,7 @@ compose.desktop {
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg
             )
             packageName = "Luma Camera AI"
-            packageVersion = "0.1.0"
+            packageVersion = "1.0.0"
         }
     }
 }
