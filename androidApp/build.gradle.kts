@@ -33,4 +33,5 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.4.2")
     implementation("androidx.camera:camera-lifecycle:1.4.2")
     implementation("androidx.camera:camera-view:1.4.2")
+    // Bundled on-device face model: works without a network model download.\n    implementation("com.google.mlkit:face-detection:16.1.7")
 }
