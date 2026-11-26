@@ -55,7 +55,8 @@ fun App(
     suggestedZoomRatio: Float? = null,
     onApplySuggestedZoom: (Float) -> Unit = {},
     photoQualitySummary: String = "",
-    photoQualityLines: List<String> = emptyList()
+    photoQualityLines: List<String> = emptyList(),
+    cameraCapabilitySummary: String = ""
 ) {
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = Background) {
@@ -192,6 +193,17 @@ fun App(
                         }
                     }
                     Text(captureStatus, color = Muted, style = MaterialTheme.typography.bodySmall)
+                }
+                if (cameraCapabilitySummary.isNotBlank()) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
+                            .background(Panel, RoundedCornerShape(20.dp)).padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text("기기 카메라 지원 범위", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                        Text(cameraCapabilitySummary, color = Muted, style = MaterialTheme.typography.bodySmall)
+                        Text("기기 제조사·카메라 모듈에 따라 지원 항목과 실제 동작이 다를 수 있습니다.", color = Muted, style = MaterialTheme.typography.labelSmall)
+                    }
                 }
                 if (photoQualitySummary.isNotBlank()) {
                     Column(
