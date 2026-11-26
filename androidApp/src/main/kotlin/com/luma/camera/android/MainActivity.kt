@@ -3,6 +3,8 @@ package com.luma.camera.android
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -50,6 +52,8 @@ import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.luma.camera.App
 import com.luma.camera.analysis.CompositionAnalyzer
 import com.luma.camera.analysis.CompositionInput
+import com.luma.camera.analysis.PhotoQualityAnalyzer
+import com.luma.camera.analysis.PhotoQualityInput
 import com.luma.camera.analysis.SceneAdviceInput
 import com.luma.camera.analysis.SceneAdvisor
 import com.luma.camera.analysis.ShootingIntent
@@ -57,6 +61,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 
@@ -90,6 +95,10 @@ private fun LumaCameraApplication() {
     var faceArea by remember { mutableStateOf(0.0) }
     var horizonTilt by remember { mutableStateOf(0f) }
     var shootingIntent by remember { mutableStateOf(ShootingIntent.PORTRAIT) }
+    var photoQualitySummary by remember { mutableStateOf("") }
+    var photoQualityLines by remember { mutableStateOf(emptyList<String>()) }
+    val qualityExecutor = remember { Executors.newSingleThreadExecutor() }
+    DisposableEffect(qualityExecutor) { onDispose { qualityExecutor.shutdownNow() } }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasCameraPermission = granted
@@ -173,6 +182,8 @@ private fun LumaCameraApplication() {
         adviceLines = sceneAdvice.recommendations,
         suggestedZoomRatio = sceneAdvice.suggestedZoomRatio,
         onApplySuggestedZoom = { zoomAction?.invoke(it) },
+        photoQualitySummary = photoQualitySummary,
+        photoQualityLines = photoQualityLines,
         cameraPreview = {
             if (hasCameraPermission) {
                 CameraPreview(
@@ -326,7 +337,21 @@ private fun CameraPreview(
                         saveCapture(activeCapture, context, mainExecutor,
                             onSaved = { uri ->
                                 isCapturing = false
-                                onCaptureStatus("저장 완료 · 갤러리에서 확인할 수 있습니다.")
+                                onCaptureStatus("저장 완료 · 사진 품질 분석 중…")
+                                photoQualitySummary = "저장된 사진을 기기 안에서 분석하고 있습니다."
+                                photoQualityLines = emptyList()
+                                analyzeSavedPhoto(uri, context, qualityExecutor, mainExecutor,
+                                    onResult = { result ->
+                                        photoQualitySummary = "종합 ${result.score}점 · 노출 ${result.exposureScore}점 · 명암 ${result.contrastScore}점 · 디테일 ${result.detailScore}점"
+                                        photoQualityLines = result.suggestions
+                                        onCaptureStatus("저장 및 사진 품질 분석 완료 · 갤러리에서도 확인할 수 있습니다.")
+                                    },
+                                    onFailure = { message ->
+                                        photoQualitySummary = "사진은 저장됐지만 분석하지 못했습니다."
+                                        photoQualityLines = listOf(message)
+                                        onCaptureStatus("사진 저장 완료 · 품질 분석은 실패했습니다.")
+                                    }
+                                )
                                 Log.i(TAG, "Photo saved: $uri")
                             },
                             onFailure = { message ->
@@ -397,4 +422,48 @@ private fun saveCapture(
             onFailure(exception.localizedMessage ?: "사진을 저장하지 못했습니다.")
         }
     })
+}
+
+private fun analyzeSavedPhoto(
+    uri: Uri,
+    context: android.content.Context,
+    worker: java.util.concurrent.ExecutorService,
+    mainExecutor: Executor,
+    onResult: (com.luma.camera.analysis.PhotoQualityResult) -> Unit,
+    onFailure: (String) -> Unit
+) {
+    worker.execute {
+        try {
+            val resolver = context.contentResolver
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+                ?: throw IllegalStateException("저장된 사진을 열 수 없습니다.")
+            var sampleSize = 1
+            while (bounds.outWidth / sampleSize > 128 || bounds.outHeight / sampleSize > 128) {
+                sampleSize *= 2
+            }
+            val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+            val decoded = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+                ?: throw IllegalStateException("사진 미리보기를 생성할 수 없습니다.")
+            val sample = Bitmap.createScaledBitmap(decoded, 64, 64, true)
+            if (sample !== decoded) decoded.recycle()
+            try {
+                val pixels = IntArray(64 * 64)
+                sample.getPixels(pixels, 0, 64, 0, 0, 64, 64)
+                val grayscale = pixels.map { color ->
+                    val red = (color shr 16) and 0xFF
+                    val green = (color shr 8) and 0xFF
+                    val blue = color and 0xFF
+                    (red * 299 + green * 587 + blue * 114) / 1000
+                }
+                val result = PhotoQualityAnalyzer.analyze(PhotoQualityInput(64, 64, grayscale))
+                mainExecutor.execute { onResult(result) }
+            } finally {
+                sample.recycle()
+            }
+        } catch (error: Exception) {
+            val message = error.localizedMessage ?: "알 수 없는 분석 오류"
+            mainExecutor.execute { onFailure(message) }
+        }
+    }
 }
