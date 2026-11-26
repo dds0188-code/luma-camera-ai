@@ -53,7 +53,9 @@ fun App(
     adviceSummary: String = "",
     adviceLines: List<String> = emptyList(),
     suggestedZoomRatio: Float? = null,
-    onApplySuggestedZoom: (Float) -> Unit = {}
+    onApplySuggestedZoom: (Float) -> Unit = {},
+    photoQualitySummary: String = "",
+    photoQualityLines: List<String> = emptyList()
 ) {
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = Background) {
@@ -191,8 +193,22 @@ fun App(
                     }
                     Text(captureStatus, color = Muted, style = MaterialTheme.typography.bodySmall)
                 }
+                if (photoQualitySummary.isNotBlank()) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
+                            .background(Panel, RoundedCornerShape(20.dp)).padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text("촬영 사진 품질 분석", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                        Text(photoQualitySummary, color = Accent, style = MaterialTheme.typography.bodyMedium)
+                        photoQualityLines.forEach { line ->
+                            Text("• $line", color = Muted, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Text("참고용 분석입니다. 디테일 점수는 초점 정확도를 직접 측정한 값이 아닙니다.", color = Muted, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
                 Text(
-                    "사진은 기기에 저장됩니다. 얼굴 구도 분석은 기기 내에서 처리됩니다.",
+                    "사진은 기기에 저장됩니다. 얼굴 및 사진 품질 분석은 기기 내에서 처리됩니다.",
                     color = Muted,
                     style = MaterialTheme.typography.bodySmall
                 )
