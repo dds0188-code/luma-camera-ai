@@ -19,6 +19,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14.3'
+      - name: Run shared logic tests
+        run: gradle :shared:desktopTest
       - name: Assemble Android debug APK
         run: gradle :androidApp:assembleDebug
       - name: Upload Android debug APK
