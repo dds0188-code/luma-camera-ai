@@ -64,6 +64,19 @@ class SceneAdvisorTest {
     }
 
     @Test
+    fun foodModeDoesNotMistakeFaceDetectionForFoodDetection() {
+        val advice = SceneAdvisor.advise(
+            SceneAdviceInput(
+                intent = ShootingIntent.FOOD,
+                subjectAreaRatio = 0.01,
+                currentZoomRatio = 1f,
+                maxZoomRatio = 8f
+            )
+        )
+        assertNull(advice.suggestedZoomRatio)
+    }
+
+    @Test
     fun architectureAdviceMentionsVerticalLines() {
         val advice = SceneAdvisor.advise(
             SceneAdviceInput(intent = ShootingIntent.ARCHITECTURE, horizonTiltDegrees = 2.0)
