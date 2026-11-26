@@ -114,16 +114,19 @@ private fun CameraPreview(
     DisposableEffect(lifecycleOwner, cameraProviderFuture, previewView) {
         var imageCapture: ImageCapture? = null
         var isCapturing = false
+        var isDisposed = false
         val listener = Runnable {
-            val cameraProvider = cameraProviderFuture.get()
-            val preview = Preview.Builder().build().also {
-                it.surfaceProvider = previewView.surfaceProvider
-            }
-            val captureUseCase = ImageCapture.Builder()
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                .setTargetRotation(previewView.display?.rotation ?: Surface.ROTATION_0)
-                .build()
+            if (isDisposed) return@Runnable
             try {
+                val cameraProvider = cameraProviderFuture.get()
+                val preview = Preview.Builder().build().also {
+                    it.surfaceProvider = previewView.surfaceProvider
+                }
+                val captureUseCase = ImageCapture.Builder()
+                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                    .setTargetRotation(previewView.display?.rotation ?: Surface.ROTATION_0)
+                    .build()
+
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(
                     lifecycleOwner,
@@ -165,6 +168,7 @@ private fun CameraPreview(
         }
         cameraProviderFuture.addListener(listener, mainExecutor)
         onDispose {
+            isDisposed = true
             onCaptureActionAvailable(null)
             imageCapture = null
             if (cameraProviderFuture.isDone) {
