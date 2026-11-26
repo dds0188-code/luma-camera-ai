@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -61,9 +60,9 @@ fun App() {
                     Text("촬영 어시스턴트", color = Color.White, style = MaterialTheme.typography.titleMedium)
                     Text("실제 카메라 기능이 연결되면 기기에서 지원하는 설정만 표시합니다.", color = Muted)
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        InfoTile("구도", "삼분할 · 대칭")
-                        InfoTile("노출", "ISO · 셔터")
-                        InfoTile("초점", "수동 · 자동")
+                        InfoTile(Modifier.weight(1f), "구도", "삼분할 · 대칭")
+                        InfoTile(Modifier.weight(1f), "노출", "ISO · 셔터")
+                        InfoTile(Modifier.weight(1f), "초점", "수동 · 자동")
                     }
                 }
                 Text("사진은 기본적으로 기기 내부에 보관됩니다.", color = Muted, style = MaterialTheme.typography.bodySmall)
@@ -73,9 +72,9 @@ fun App() {
 }
 
 @Composable
-private fun InfoTile(title: String, detail: String) {
+private fun InfoTile(modifier: Modifier, title: String, detail: String) {
     Column(
-        modifier = Modifier.weight(1f).background(Color(0xFF222832), RoundedCornerShape(14.dp)).padding(12.dp),
+        modifier = modifier.background(Color(0xFF222832), RoundedCornerShape(14.dp)).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         Text(title, color = Accent, style = MaterialTheme.typography.labelMedium)
