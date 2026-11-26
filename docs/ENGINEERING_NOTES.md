@@ -74,3 +74,12 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - Capability inspection is read-only. It does not yet change ISO, shutter time, or white balance; those controls require safe auto/manual transitions and physical-device validation.
 - Missing characteristics are shown as unavailable rather than guessed. Values describe the selected rear camera module and may differ across lenses.
 - This is a capability inventory, not a guarantee that every reported mode behaves identically in every capture pipeline.
+
+
+## Camera-first UI and native Android identity
+
+- Reworked the shared Compose screen into a camera-first dark interface with a fixed live preview region and a separately scrollable controls/results area.
+- Added a device-backed torch toggle. The control is disabled when the active rear camera does not report flash hardware.
+- Added a native Android adaptive launcher icon using vector drawables; no HTML, remote image, or WebView is used for the installed app identity.
+- The Android app remains a native Kotlin/Jetpack Compose application using CameraX for live preview, focus, and capture.
+- Manual ISO/shutter/white-balance request controls remain a separate next implementation step; this UI pass does not imply those controls are already available.
