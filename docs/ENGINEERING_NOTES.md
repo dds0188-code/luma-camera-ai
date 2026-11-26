@@ -65,3 +65,12 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - Analysis is performed on-device; the original JPEG remains saved in Pictures/LumaCameraAI.
 - Limitations: this is a luminance-statistics heuristic, not a trained image-quality model. The detail metric is local contrast and cannot reliably distinguish true focus from noise, texture, or motion blur. Scores are comparative hints, not objective image-quality grades.
 - Physical-device validation is required for MediaStore URI decoding, orientation behavior, memory use, and responsiveness across device vendors. The current UI shows the most recent capture's result only; persistent history and editing-value recommendations are not yet implemented.
+
+
+## Camera hardware capability inspection v1
+
+- The Android rear camera reads Camera2 characteristics through the active CameraX camera.
+- The UI reports device-advertised ISO sensitivity range, exposure-time range, manual-sensor capability, available white-balance modes, and flash availability.
+- Capability inspection is read-only. It does not yet change ISO, shutter time, or white balance; those controls require safe auto/manual transitions and physical-device validation.
+- Missing characteristics are shown as unavailable rather than guessed. Values describe the selected rear camera module and may differ across lenses.
+- This is a capability inventory, not a guarantee that every reported mode behaves identically in every capture pipeline.
