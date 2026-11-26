@@ -43,10 +43,7 @@ compose.desktop {
     application {
         mainClass = "com.luma.camera.MainKt"
         nativeDistributions {
-            targetFormats(
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg
-            )
+            targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi)
             packageName = "Luma Camera AI"
             packageVersion = "1.0.0"
         }
