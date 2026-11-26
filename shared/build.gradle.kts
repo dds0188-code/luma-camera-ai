@@ -25,6 +25,9 @@ kotlin {
             implementation(libs.androidx.camera.lifecycle)
             implementation(libs.androidx.camera.view)
         }
+        desktopMain.dependencies {
+            implementation(compose.desktop.currentOs)
+        }
     }
 }
 
@@ -32,4 +35,18 @@ android {
     namespace = "com.luma.camera.shared"
     compileSdk = 36
     defaultConfig { minSdk = 26 }
+}
+
+compose.desktop {
+    application {
+        mainClass = "com.luma.camera.MainKt"
+        nativeDistributions {
+            targetFormats(
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg
+            )
+            packageName = "Luma Camera AI"
+            packageVersion = "0.1.0"
+        }
+    }
 }
