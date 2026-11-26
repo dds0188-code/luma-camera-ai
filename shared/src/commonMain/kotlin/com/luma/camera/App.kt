@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +26,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 
 private val Background = Color(0xFF0B0D10)
 private val Panel = Color(0xFF171B21)
@@ -35,20 +37,29 @@ private val Muted = Color(0xFF9AA4B2)
 fun App(
     cameraPreview: @Composable () -> Unit = { PreviewPlaceholder() },
     onCaptureClick: () -> Unit = {},
-    captureStatus: String = "카메라 연결 대기 중"
+    captureStatus: String = "카메라 연결 대기 중",
+    zoomRatio: Float = 1f,
+    maxZoomRatio: Float = 1f,
+    onZoomChange: (Float) -> Unit = {},
+    exposureIndex: Int = 0,
+    minExposureIndex: Int = 0,
+    maxExposureIndex: Int = 0,
+    onExposureChange: (Int) -> Unit = {},
+    horizonTiltDegrees: Float = 0f,
+    compositionGuidance: String = "피사체를 찾는 중입니다."
 ) {
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = Background) {
             Column(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("LUMA", color = Accent, style = MaterialTheme.typography.labelLarge)
                         Text("CAMERA AI", color = Color.White, style = MaterialTheme.typography.headlineSmall)
                     }
-                    Text("LOCAL AI · OFFLINE", color = Muted, style = MaterialTheme.typography.labelSmall)
+                    Text("ON-DEVICE ASSIST", color = Muted, style = MaterialTheme.typography.labelSmall)
                 }
 
                 Box(
@@ -62,12 +73,25 @@ fun App(
                             modifier = Modifier.align(Alignment.TopStart).padding(14.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text("구도 가이드", color = Accent, style = MaterialTheme.typography.labelLarge)
-                            Text("삼분할 기준선", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                            Text("실시간 구도 가이드", color = Accent, style = MaterialTheme.typography.labelLarge)
+                            Text("얼굴 인식 · 삼분할", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                        }
+                        Column(
+                            modifier = Modifier.align(Alignment.TopEnd).padding(14.dp),
+                            horizontalAlignment = Alignment.End
+                        ) {
+                            val levelText = when {
+                                abs(horizonTiltDegrees) < 1.5f -> "수평 양호"
+                                horizonTiltDegrees > 0f -> "오른쪽 기울기"
+                                else -> "왼쪽 기울기"
+                            }
+                            Text(levelText, color = if (abs(horizonTiltDegrees) < 1.5f) Accent else Color(0xFFFFC078))
+                            Text("${"%.1f".format(kotlin.math.abs(horizonTiltDegrees))}°", color = Color.White)
                         }
                         Text(
-                            "피사체 위치와 여백을 확인하세요",
-                            modifier = Modifier.align(Alignment.BottomStart).padding(14.dp),
+                            compositionGuidance,
+                            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                                .background(Color(0xCC101419)).padding(12.dp),
                             color = Color.White,
                             style = MaterialTheme.typography.labelMedium
                         )
@@ -77,17 +101,36 @@ fun App(
                 Column(
                     modifier = Modifier.fillMaxWidth()
                         .background(Panel, RoundedCornerShape(20.dp)).padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("촬영 어시스턴트", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                        Text("카메라 설정", color = Color.White, style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.weight(1f))
-                        Text("ANDROID CAMERA", color = Accent, style = MaterialTheme.typography.labelSmall)
+                        Text("기기 지원 범위 적용", color = Accent, style = MaterialTheme.typography.labelSmall)
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        InfoTile(Modifier.weight(1f), "구도", "삼분할")
-                        InfoTile(Modifier.weight(1f), "노출", "자동")
-                        InfoTile(Modifier.weight(1f), "초점", "자동")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("줌  ${"%.1f".format(zoomRatio)}×", color = Color.White, modifier = Modifier.weight(1f))
+                        Text("최대 ${"%.1f".format(maxZoomRatio)}×", color = Muted, style = MaterialTheme.typography.labelSmall)
+                    }
+                    Slider(
+                        value = zoomRatio.coerceIn(1f, maxZoomRatio.coerceAtLeast(1f)),
+                        onValueChange = onZoomChange,
+                        valueRange = 1f..maxZoomRatio.coerceAtLeast(1.01f),
+                        enabled = maxZoomRatio > 1.01f
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("노출 보정  $exposureIndex", color = Color.White, modifier = Modifier.weight(1f))
+                        Text("기기 지원 범위", color = Muted, style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (maxExposureIndex > minExposureIndex) {
+                        Slider(
+                            value = exposureIndex.toFloat().coerceIn(minExposureIndex.toFloat(), maxExposureIndex.toFloat()),
+                            onValueChange = { onExposureChange(it.toInt()) },
+                            valueRange = minExposureIndex.toFloat()..maxExposureIndex.toFloat(),
+                            steps = (maxExposureIndex - minExposureIndex - 1).coerceAtLeast(0)
+                        )
+                    } else {
+                        Text("이 카메라는 노출 보정 조절을 지원하지 않습니다.", color = Muted, style = MaterialTheme.typography.bodySmall)
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -97,11 +140,8 @@ fun App(
                         Button(
                             onClick = onCaptureClick,
                             shape = CircleShape,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Accent,
-                                contentColor = Color(0xFF07110F)
-                            ),
-                            modifier = Modifier.height(56.dp)
+                            colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF07110F)),
+                            modifier = Modifier.height(52.dp)
                         ) {
                             Text("  촬영  ", style = MaterialTheme.typography.titleMedium)
                         }
@@ -109,7 +149,7 @@ fun App(
                     Text(captureStatus, color = Muted, style = MaterialTheme.typography.bodySmall)
                 }
                 Text(
-                    "사진은 기기의 사진 앱 > LumaCameraAI 앨범에 저장됩니다.",
+                    "사진은 기기에 저장됩니다. 얼굴 구도 분석은 기기 내에서 처리됩니다.",
                     color = Muted,
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -129,17 +169,6 @@ private fun CompositionGrid(modifier: Modifier = Modifier) {
             drawLine(lineColor, Offset(x, 0f), Offset(x, size.height), stroke, cap = StrokeCap.Round)
             drawLine(lineColor, Offset(0f, y), Offset(size.width, y), stroke, cap = StrokeCap.Round)
         }
-    }
-}
-
-@Composable
-private fun InfoTile(modifier: Modifier, title: String, detail: String) {
-    Column(
-        modifier = modifier.background(Color(0xFF222832), RoundedCornerShape(12.dp)).padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Text(title, color = Accent, style = MaterialTheme.typography.labelMedium)
-        Text(detail, color = Color.White, style = MaterialTheme.typography.bodySmall)
     }
 }
 
