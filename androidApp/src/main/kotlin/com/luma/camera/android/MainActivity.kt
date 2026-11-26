@@ -85,6 +85,7 @@ private fun LumaCameraApplication() {
     var captureAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var zoomAction by remember { mutableStateOf<((Float) -> Unit)?>(null) }
     var exposureAction by remember { mutableStateOf<((Int) -> Unit)?>(null) }
+    var torchAction by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
     var captureStatus by remember { mutableStateOf("카메라 초기화 중…") }
     var zoomRatio by remember { mutableStateOf(1f) }
     var maxZoomRatio by remember { mutableStateOf(1f) }
@@ -100,6 +101,7 @@ private fun LumaCameraApplication() {
     var photoQualitySummary by remember { mutableStateOf("") }
     var photoQualityLines by remember { mutableStateOf(emptyList<String>()) }
     var cameraCapabilitySummary by remember { mutableStateOf("카메라 지원 기능 확인 중…") }
+    var torchEnabled by remember { mutableStateOf(false) }
     val qualityExecutor = remember { Executors.newSingleThreadExecutor() }
     DisposableEffect(qualityExecutor) { onDispose { qualityExecutor.shutdownNow() } }
 
@@ -188,6 +190,8 @@ private fun LumaCameraApplication() {
         photoQualitySummary = photoQualitySummary,
         photoQualityLines = photoQualityLines,
         cameraCapabilitySummary = cameraCapabilitySummary,
+        torchEnabled = torchEnabled,
+        onTorchToggle = { torchAction?.invoke(it) },
         cameraPreview = {
             if (hasCameraPermission) {
                 CameraPreview(
@@ -195,6 +199,8 @@ private fun LumaCameraApplication() {
                     onCaptureStatus = { captureStatus = it },
                     onZoomActionAvailable = { zoomAction = it },
                     onExposureActionAvailable = { exposureAction = it },
+                    onTorchActionAvailable = { torchAction = it },
+                    onTorchInfo = { torchEnabled = it },
                     onZoomInfo = { current, maximum -> zoomRatio = current; maxZoomRatio = maximum },
                     onExposureInfo = { current, minimum, maximum ->
                         exposureIndex = current; minExposureIndex = minimum; maxExposureIndex = maximum
@@ -224,6 +230,8 @@ private fun CameraPreview(
     onCaptureStatus: (String) -> Unit,
     onZoomActionAvailable: (((Float) -> Unit)?) -> Unit,
     onExposureActionAvailable: (((Int) -> Unit)?) -> Unit,
+    onTorchActionAvailable: (((Boolean) -> Unit)?) -> Unit,
+    onTorchInfo: (Boolean) -> Unit,
     onZoomInfo: (Float, Float) -> Unit,
     onExposureInfo: (Int, Int, Int) -> Unit,
     qualityExecutor: java.util.concurrent.ExecutorService,
@@ -360,6 +368,13 @@ private fun CameraPreview(
                     boundCamera.cameraControl.setExposureCompensationIndex(safeIndex)
                     onExposureInfo(safeIndex, exposureRange.lower, exposureRange.upper)
                 }
+                onTorchInfo(false)
+                onTorchActionAvailable { enabled ->
+                    if (boundCamera.cameraInfo.hasFlashUnit()) {
+                        boundCamera.cameraControl.enableTorch(enabled)
+                            .addListener({ onTorchInfo(enabled) }, mainExecutor)
+                    }
+                }
                 previewView.setOnTouchListener { _, event ->
                     when (event.action) {
                         MotionEvent.ACTION_DOWN -> true
@@ -416,6 +431,7 @@ private fun CameraPreview(
                 onCaptureActionAvailable(null)
                 onZoomActionAvailable(null)
                 onExposureActionAvailable(null)
+                onTorchActionAvailable(null)
                 onCaptureStatus("카메라 연결 실패: ${error.localizedMessage ?: "알 수 없는 오류"}")
                 Log.e(TAG, "Camera binding failed", error)
             }
@@ -426,6 +442,7 @@ private fun CameraPreview(
             onCaptureActionAvailable(null)
             onZoomActionAvailable(null)
             onExposureActionAvailable(null)
+            onTorchActionAvailable(null)
             previewView.setOnTouchListener(null)
             imageCapture = null
             detector.close()
