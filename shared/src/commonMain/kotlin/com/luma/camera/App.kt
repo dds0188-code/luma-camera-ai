@@ -26,6 +26,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
+import com.luma.camera.analysis.ShootingIntent
 import kotlin.math.abs
 
 private val Background = Color(0xFF0B0D10)
@@ -46,7 +47,13 @@ fun App(
     maxExposureIndex: Int = 0,
     onExposureChange: (Int) -> Unit = {},
     horizonTiltDegrees: Float = 0f,
-    compositionGuidance: String = "피사체를 찾는 중입니다."
+    compositionGuidance: String = "피사체를 찾는 중입니다.",
+    shootingIntent: ShootingIntent = ShootingIntent.PORTRAIT,
+    onShootingIntentChange: (ShootingIntent) -> Unit = {},
+    adviceSummary: String = "",
+    adviceLines: List<String> = emptyList(),
+    suggestedZoomRatio: Float? = null,
+    onApplySuggestedZoom: (Float) -> Unit = {}
 ) {
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = Background) {
@@ -62,6 +69,27 @@ fun App(
                     Text("ON-DEVICE ASSIST", color = Muted, style = MaterialTheme.typography.labelSmall)
                 }
 
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ShootingIntent.values().forEach { intent ->
+                        Button(
+                            onClick = { onShootingIntentChange(intent) },
+                            modifier = Modifier.weight(1f).height(38.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 2.dp, vertical = 0.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (shootingIntent == intent) Accent else Panel,
+                                contentColor = if (shootingIntent == intent) Color(0xFF07110F) else Color.White
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(intent.label, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+
                 Box(
                     modifier = Modifier.fillMaxWidth().weight(1f)
                         .background(Panel, RoundedCornerShape(24.dp))
@@ -74,7 +102,7 @@ fun App(
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text("실시간 구도 가이드", color = Accent, style = MaterialTheme.typography.labelLarge)
-                            Text("얼굴 인식 · 삼분할", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                            Text("${shootingIntent.label} · 실시간 촬영 가이드", color = Color.White, style = MaterialTheme.typography.labelSmall)
                         }
                         Column(
                             modifier = Modifier.align(Alignment.TopEnd).padding(14.dp),
@@ -107,6 +135,21 @@ fun App(
                         Text("카메라 설정", color = Color.White, style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.weight(1f))
                         Text("기기 지원 범위 적용", color = Accent, style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (adviceSummary.isNotBlank()) {
+                        Text(adviceSummary, color = Accent, style = MaterialTheme.typography.bodySmall)
+                    }
+                    adviceLines.take(2).forEach { line ->
+                        Text("• $line", color = Muted, style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (suggestedZoomRatio != null) {
+                        Button(
+                            onClick = { onApplySuggestedZoom(suggestedZoomRatio) },
+                            modifier = Modifier.fillMaxWidth().height(40.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF07110F))
+                        ) {
+                            Text("추천 줌 ${"%.1f".format(suggestedZoomRatio)}× 적용")
+                        }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("줌  ${"%.1f".format(zoomRatio)}×", color = Color.White, modifier = Modifier.weight(1f))
