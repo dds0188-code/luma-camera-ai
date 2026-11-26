@@ -1,5 +1,10 @@
 # Engineering notes
 
+## Platform scope
+- Android: CameraX preview and image capture; save photos to MediaStore under Pictures/LumaCameraAI.
+- Windows: Compose desktop shell and MSI packaging. Native Media Foundation camera integration is planned and is not yet implemented.
+- macOS and web are explicitly out of scope.
+
 ## Composition analysis v0
 The first common-code analyzer is a deterministic heuristic, not an ML model. It accepts normalized subject center, subject area ratio, and horizon tilt. It returns a transparent weighted score and Korean suggestions.
 
@@ -8,19 +13,18 @@ Current weighting:
 - Subject framing/occupancy heuristic: 35%
 - Horizon level: 25%
 
-This is deliberately a baseline. Later camera-frame detection must provide measured inputs and confidence values. Scores must not be presented as objective artistic truth.
+Scores must not be presented as objective artistic truth. The on-screen thirds grid is a visual guide; it is not yet connected to automatic subject detection or device-level sensors.
 
-## Camera integration sequence
-1. Request permission only when the user enters camera mode.
-2. Enumerate available cameras and supported capabilities.
-3. Bind preview and capture lifecycle to the visible screen.
-4. Expose only controls supported by the selected camera.
-5. Save to the user's chosen local destination; do not upload images.
-6. Validate on real devices; emulator camera support is not sufficient evidence.
+## Android capture flow
+1. Request camera permission when the app opens camera mode.
+2. Bind Preview and ImageCapture to the visible lifecycle.
+3. Prevent duplicate capture requests while a shot is in progress.
+4. Save JPEGs locally through MediaStore in Pictures/LumaCameraAI.
+5. On Android 10+, use IS_PENDING during the save transaction.
+6. Verify capture, orientation, and gallery visibility on physical Android devices; CI compilation alone is not hardware validation.
 
-## Platform adapters
-- Android: CameraX Preview + ImageCapture + Camera2Interop capability inspection.
-- Windows: Media Foundation capture source and camera control capability inspection.
-- macOS: AVFoundation capture session and device format/control inspection.
-
-Desktop adapters are separate implementations; a JVM shared UI does not imply that desktop camera APIs are already integrated.
+## Next integration sequence
+- Enumerate camera capabilities and expose only supported manual settings.
+- Add device orientation / horizon sensing.
+- Add on-device subject detection with confidence-aware output.
+- Add Windows Media Foundation capture source and camera control inspection.
