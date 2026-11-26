@@ -195,6 +195,9 @@ private fun LumaCameraApplication() {
                     onExposureInfo = { current, minimum, maximum ->
                         exposureIndex = current; minExposureIndex = minimum; maxExposureIndex = maximum
                     },
+                    qualityExecutor = qualityExecutor,
+                    onPhotoQualitySummary = { photoQualitySummary = it },
+                    onPhotoQualityLines = { photoQualityLines = it },
                     onFaceDetected = { x, y, area ->
                         faceCenterX = x; faceCenterY = y; faceArea = area
                         faceGuidance = "얼굴 피사체 감지 · 구도 분석 중"
@@ -218,6 +221,9 @@ private fun CameraPreview(
     onExposureActionAvailable: (((Int) -> Unit)?) -> Unit,
     onZoomInfo: (Float, Float) -> Unit,
     onExposureInfo: (Int, Int, Int) -> Unit,
+    qualityExecutor: java.util.concurrent.ExecutorService,
+    onPhotoQualitySummary: (String) -> Unit,
+    onPhotoQualityLines: (List<String>) -> Unit,
     onFaceDetected: (Double, Double, Double) -> Unit,
     onFaceLost: () -> Unit
 ) {
@@ -338,17 +344,17 @@ private fun CameraPreview(
                             onSaved = { uri ->
                                 isCapturing = false
                                 onCaptureStatus("저장 완료 · 사진 품질 분석 중…")
-                                photoQualitySummary = "저장된 사진을 기기 안에서 분석하고 있습니다."
-                                photoQualityLines = emptyList()
+                                onPhotoQualitySummary("저장된 사진을 기기 안에서 분석하고 있습니다.")
+                                onPhotoQualityLines(emptyList())
                                 analyzeSavedPhoto(uri, context, qualityExecutor, mainExecutor,
                                     onResult = { result ->
-                                        photoQualitySummary = "종합 ${result.score}점 · 노출 ${result.exposureScore}점 · 명암 ${result.contrastScore}점 · 디테일 ${result.detailScore}점"
-                                        photoQualityLines = result.suggestions
+                                        onPhotoQualitySummary("종합 ${result.score}점 · 노출 ${result.exposureScore}점 · 명암 ${result.contrastScore}점 · 디테일 ${result.detailScore}점")
+                                        onPhotoQualityLines(result.suggestions)
                                         onCaptureStatus("저장 및 사진 품질 분석 완료 · 갤러리에서도 확인할 수 있습니다.")
                                     },
                                     onFailure = { message ->
-                                        photoQualitySummary = "사진은 저장됐지만 분석하지 못했습니다."
-                                        photoQualityLines = listOf(message)
+                                        onPhotoQualitySummary("사진은 저장됐지만 분석하지 못했습니다.")
+                                        onPhotoQualityLines(listOf(message))
                                         onCaptureStatus("사진 저장 완료 · 품질 분석은 실패했습니다.")
                                     }
                                 )
