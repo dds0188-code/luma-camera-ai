@@ -38,3 +38,12 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - The rotation-vector sensor supplies a live roll / horizon-level guide, remapped for the current display orientation.
 - Scope limitation: this model detects faces, not arbitrary objects or complete human bodies. It does not yet infer camera-to-subject height, exact camera angle, scene genre, lens equivalence, or lighting quality. Those require additional on-device models and calibration; do not present guesses as measured facts.
 - Android hardware validation is still required for zoom/exposure ranges, sensor orientation, tap-to-focus, and sustained thermal/performance behavior.
+
+
+## Shooting intent advisor v1
+- Added four explicit shooting-intent profiles: portrait, landscape, architecture, and food.
+- The common, offline SceneAdvisor returns concise composition/angle/scene guidance from available face-box position, face area, horizon roll, and device-reported zoom limits.
+- Portrait zoom suggestions use the detected face area and are clamped to the camera's supported zoom range. The user must tap the recommendation to apply it; the app does not unexpectedly change framing.
+- Landscape guidance prioritizes a wide view, horizon placement, and foreground depth. Architecture guidance prioritizes vertical lines, level camera roll, and avoiding excessive upward tilt. Food guidance is currently general technique guidance only.
+- Important limitation: shooting intent is currently user-selected, not automatically classified. The ML Kit model still detects faces only. Face bounding boxes are never treated as food, object, or building detections. Exact subject distance, physical focal length, pitch angle, and scene recognition remain unimplemented.
+- Shared tests cover zoom clamping, portrait area-to-zoom calculation, non-face-based landscape/food advice, and architecture guidance.
