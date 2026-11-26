@@ -47,3 +47,12 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - Landscape guidance prioritizes a wide view, horizon placement, and foreground depth. Architecture guidance prioritizes vertical lines, level camera roll, and avoiding excessive upward tilt. Food guidance is currently general technique guidance only.
 - Important limitation: shooting intent is currently user-selected, not automatically classified. The ML Kit model still detects faces only. Face bounding boxes are never treated as food, object, or building detections. Exact subject distance, physical focal length, pitch angle, and scene recognition remain unimplemented.
 - Shared tests cover zoom clamping, portrait area-to-zoom calculation, non-face-based landscape/food advice, and architecture guidance.
+
+## Offline post-capture quality analysis groundwork
+
+- Added a platform-independent analyzer for small, uniformly sampled grayscale previews.
+- It reports exposure clipping (near-black / near-white), global contrast, and local-neighbour contrast as a detail/sharpness proxy, with Korean reshoot suggestions.
+- Input validation rejects malformed grids and values outside 8-bit grayscale.
+- The analyzer is deterministic and fully offline; it does not upload or retain image data.
+- Important: local-neighbour contrast is not a calibrated focus or motion-blur detector. A noisy image can appear detailed, and a naturally smooth scene can score low.
+- This commit adds the tested analysis engine only. The Android capture callback is not yet wired to feed a downsampled image into it, and no post-capture results screen is claimed complete.
