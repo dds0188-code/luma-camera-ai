@@ -28,3 +28,13 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - Add device orientation / horizon sensing.
 - Add on-device subject detection with confidence-aware output.
 - Add Windows Media Foundation capture source and camera control inspection.
+
+
+## Android camera assistant v1
+- CameraX now exposes the device-reported zoom ratio range and exposure compensation range. Unsupported ranges are disabled rather than simulated.
+- Tapping the live preview requests CameraX focus and metering at that point.
+- The Android app uses the bundled ML Kit face-detection model for on-device face bounding boxes. Frames are analyzed with KEEP_ONLY_LATEST and a single in-flight inference guard; frames are always closed on completion.
+- Face center and normalized face area feed the common composition heuristic. The UI offers qualitative framing and zoom-in/zoom-out guidance, not a guaranteed ideal focal length.
+- The rotation-vector sensor supplies a live roll / horizon-level guide, remapped for the current display orientation.
+- Scope limitation: this model detects faces, not arbitrary objects or complete human bodies. It does not yet infer camera-to-subject height, exact camera angle, scene genre, lens equivalence, or lighting quality. Those require additional on-device models and calibration; do not present guesses as measured facts.
+- Android hardware validation is still required for zoom/exposure ranges, sensor orientation, tap-to-focus, and sustained thermal/performance behavior.
