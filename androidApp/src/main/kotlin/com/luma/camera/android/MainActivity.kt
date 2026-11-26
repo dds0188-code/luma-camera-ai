@@ -140,7 +140,7 @@ private fun CameraPreview(
                     } else {
                         isCapturing = true
                         onCaptureStatus("사진 촬영 중…")
-                        saveCapture(activeCapture, mainExecutor,
+                        saveCapture(activeCapture, context, mainExecutor,
                             onSaved = { uri ->
                                 isCapturing = false
                                 onCaptureStatus("저장 완료 · 갤러리에서 확인할 수 있습니다.")
@@ -175,13 +175,12 @@ private fun CameraPreview(
 
 private fun saveCapture(
     imageCapture: ImageCapture,
+    context: android.content.Context,
     executor: Executor,
     onSaved: (Uri) -> Unit,
     onError: (String) -> Unit
 ) {
-    val context = LumaCameraApplicationContextHolder.context
-    // The activity context is supplied by the composable before each capture.
-    val resolver = context?.contentResolver
+    val resolver = context.contentResolver
     if (resolver == null) {
         onError("저장소에 접근할 수 없습니다.")
         return
@@ -218,8 +217,4 @@ private fun saveCapture(
             onError(exception.localizedMessage ?: "사진을 저장하지 못했습니다.")
         }
     })
-}
-
-private object LumaCameraApplicationContextHolder {
-    var context: android.content.Context? = null
 }
