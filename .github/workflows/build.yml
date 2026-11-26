@@ -21,6 +21,12 @@ jobs:
           gradle-version: '8.14.3'
       - name: Assemble Android debug APK
         run: gradle :androidApp:assembleDebug
+      - name: Upload Android debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: luma-camera-ai-android-debug-apk
+          path: androidApp/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
 
   desktop:
     strategy:
@@ -39,3 +45,23 @@ jobs:
           gradle-version: '8.14.3'
       - name: Compile desktop target
         run: gradle :shared:compileKotlinDesktop
+      - name: Package Windows installer
+        if: matrix.os == 'windows-latest'
+        run: gradle :shared:packageMsi
+      - name: Upload Windows installer
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: luma-camera-ai-windows-msi
+          path: shared/build/compose/binaries/main/msi/*.msi
+          if-no-files-found: error
+      - name: Package macOS installer
+        if: matrix.os == 'macos-latest'
+        run: gradle :shared:packageDmg
+      - name: Upload macOS installer
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: luma-camera-ai-macos-dmg
+          path: shared/build/compose/binaries/main/dmg/*.dmg
+          if-no-files-found: error
