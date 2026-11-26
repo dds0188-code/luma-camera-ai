@@ -18,7 +18,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
@@ -60,7 +59,6 @@ import java.util.Locale
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
-import kotlin.math.atan2
 
 private const val TAG = "LumaCamera"
 
@@ -169,6 +167,12 @@ private fun LumaCameraApplication() {
         onExposureChange = { exposureAction?.invoke(it) },
         horizonTiltDegrees = horizonTilt,
         compositionGuidance = guidance,
+        shootingIntent = shootingIntent,
+        onShootingIntentChange = { shootingIntent = it },
+        adviceSummary = sceneAdvice.summary,
+        adviceLines = sceneAdvice.recommendations,
+        suggestedZoomRatio = sceneAdvice.suggestedZoomRatio,
+        onApplySuggestedZoom = { zoomAction?.invoke(it) },
         cameraPreview = {
             if (hasCameraPermission) {
                 CameraPreview(
@@ -227,7 +231,6 @@ private fun CameraPreview(
 
     DisposableEffect(lifecycleOwner, cameraProviderFuture, previewView, detector) {
         var imageCapture: ImageCapture? = null
-        var camera: Camera? = null
         var isCapturing = false
         var isDisposed = false
         val analysisBusy = AtomicBoolean(false)
@@ -278,7 +281,6 @@ private fun CameraPreview(
                 val boundCamera = provider.bindToLifecycle(
                     lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture, analysis
                 )
-                camera = boundCamera
                 imageCapture = capture
                 val zoomState = boundCamera.cameraInfo.zoomState.value
                 val maxZoom = zoomState?.maxZoomRatio ?: 1f
@@ -351,7 +353,6 @@ private fun CameraPreview(
             onExposureActionAvailable(null)
             previewView.setOnTouchListener(null)
             imageCapture = null
-            camera = null
             detector.close()
             if (cameraProviderFuture.isDone) runCatching { cameraProviderFuture.get().unbindAll() }
         }
