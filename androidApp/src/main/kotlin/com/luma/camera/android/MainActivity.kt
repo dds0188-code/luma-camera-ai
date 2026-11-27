@@ -306,6 +306,8 @@ private fun CameraPreview(
 
     DisposableEffect(lifecycleOwner, cameraProviderFuture, previewView, detector, imageLabeler, lensFacing) {
         var imageCapture: ImageCapture? = null
+        var imageAnalysis: ImageAnalysis? = null
+        var boundProvider: ProcessCameraProvider? = null
         var isCapturing = false
         var isDisposed = false
         val timerHandler = Handler(Looper.getMainLooper())
@@ -317,6 +319,7 @@ private fun CameraPreview(
             if (isDisposed) return@Runnable
             try {
                 val provider = cameraProviderFuture.get()
+                boundProvider = provider
                 val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
                 val capture = ImageCapture.Builder()
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
@@ -325,6 +328,7 @@ private fun CameraPreview(
                 val analysis = ImageAnalysis.Builder()
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
+                imageAnalysis = analysis
                 analysis.setAnalyzer(analysisExecutor) { proxy ->
                     val mediaImage = proxy.image
                     if (mediaImage == null || !analysisBusy.compareAndSet(false, true)) {
@@ -558,11 +562,14 @@ private fun CameraPreview(
             onExposureActionAvailable(null)
             onTorchActionAvailable(null)
             previewView.setOnTouchListener(null)
+            imageAnalysis?.clearAnalyzer()
+            imageAnalysis = null
             imageCapture = null
+            runCatching { boundProvider?.unbindAll() }
+            boundProvider = null
+            analysisExecutor.shutdown()
             detector.close()
             imageLabeler.close()
-            analysisExecutor.shutdown()
-            if (cameraProviderFuture.isDone) runCatching { cameraProviderFuture.get().unbindAll() }
         }
     }
     AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
