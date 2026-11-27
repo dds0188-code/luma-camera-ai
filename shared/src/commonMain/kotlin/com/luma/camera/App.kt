@@ -336,7 +336,7 @@ fun App(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("촬영 제안", color = TextMain, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text("AI 포토그래퍼 · 실시간 디렉팅", color = TextMain, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                             Text(adviceSummary.ifBlank { "장면에 맞는 촬영 구도를 분석합니다." }, color = Muted, style = MaterialTheme.typography.bodySmall)
                         }
                         if (suggestedZoomRatio != null) {
@@ -348,7 +348,7 @@ fun App(
                             ) { Text("${"%.1f".format(suggestedZoomRatio)}× 적용", style = MaterialTheme.typography.labelSmall) }
                         }
                     }
-                    adviceLines.take(2).forEach { line ->
+                    adviceLines.take(4).forEach { line ->
                         Text("· $line", color = Muted, style = MaterialTheme.typography.bodySmall)
                     }
 
