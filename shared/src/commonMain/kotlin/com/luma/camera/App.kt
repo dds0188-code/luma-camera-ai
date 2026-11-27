@@ -60,6 +60,16 @@ fun App(
     minExposureIndex: Int = 0,
     maxExposureIndex: Int = 0,
     onExposureChange: (Int) -> Unit = {},
+    manualExposureSupported: Boolean = false,
+    manualExposureEnabled: Boolean = false,
+    manualIso: Int = 100,
+    manualIsoMin: Int = 100,
+    manualIsoMax: Int = 800,
+    manualShutterNs: Long = 16_666_667L,
+    onManualIsoChange: (Int) -> Unit = {},
+    onManualShutterChange: (Long) -> Unit = {},
+    onManualExposureToggle: (Boolean) -> Unit = {},
+    onApplyManualExposure: () -> Unit = {},
     horizonTiltDegrees: Float = 0f,
     compositionGuidance: String = "피사체를 찾는 중입니다.",
     shootingIntent: ShootingIntent = ShootingIntent.PORTRAIT,
@@ -302,6 +312,54 @@ fun App(
                             )
                         } else {
                             Text("이 기기에서 노출 보정 범위를 제공하지 않습니다.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (manualExposureSupported) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(PanelRaised).padding(11.dp),
+                                verticalArrangement = Arrangement.spacedBy(7.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("수동 노출", color = TextMain, fontWeight = FontWeight.SemiBold)
+                                        Text(if (manualExposureEnabled) "ISO·셔터 수동 제어 중" else "자동 노출 사용 중", color = Muted, style = MaterialTheme.typography.labelSmall)
+                                    }
+                                    Button(
+                                        onClick = { onManualExposureToggle(!manualExposureEnabled) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = if (manualExposureEnabled) Accent else Panel, contentColor = if (manualExposureEnabled) Color(0xFF10170B) else TextMain),
+                                        shape = CircleShape
+                                    ) { Text(if (manualExposureEnabled) "자동 전환" else "수동 전환") }
+                                }
+                                if (manualExposureEnabled) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("ISO", color = TextMain, modifier = Modifier.weight(1f))
+                                        Text(manualIso.toString(), color = Accent, fontWeight = FontWeight.Bold)
+                                    }
+                                    Slider(
+                                        value = manualIso.toFloat().coerceIn(manualIsoMin.toFloat(), manualIsoMax.toFloat()),
+                                        onValueChange = { onManualIsoChange(it.toInt().coerceIn(manualIsoMin, manualIsoMax)) },
+                                        valueRange = manualIsoMin.toFloat()..manualIsoMax.coerceAtLeast(manualIsoMin + 1).toFloat()
+                                    )
+                                    Text("셔터 속도", color = TextMain, style = MaterialTheme.typography.labelMedium)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                        listOf(33_333_333L to "1/30", 16_666_667L to "1/60", 8_000_000L to "1/125", 4_000_000L to "1/250", 2_000_000L to "1/500").forEach { (speed, label) ->
+                                            val selected = kotlin.math.abs(manualShutterNs - speed) < 1_000_000L
+                                            Button(
+                                                onClick = { onManualShutterChange(speed) },
+                                                modifier = Modifier.weight(1f).height(32.dp),
+                                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 2.dp, vertical = 0.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = if (selected) Accent else Panel, contentColor = if (selected) Color(0xFF10170B) else Muted),
+                                                shape = CircleShape
+                                            ) { Text(label, style = MaterialTheme.typography.labelSmall) }
+                                        }
+                                    }
+                                    Button(
+                                        onClick = onApplyManualExposure,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF10170B)),
+                                        shape = CircleShape
+                                    ) { Text("수동 설정 적용 · ISO $manualIso · ${"%.0f".format(1_000_000_000.0 / manualShutterNs)}분의 1초") }
+                                }
+                            }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
