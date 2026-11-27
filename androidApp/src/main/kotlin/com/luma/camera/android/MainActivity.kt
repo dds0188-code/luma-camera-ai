@@ -790,7 +790,8 @@ private fun CameraPreview(
                     (if (lensFacing == CameraSelector.LENS_FACING_FRONT) "전면 카메라 · " else "후면 카메라 · ") +
                         (if (boundCamera.cameraInfo.hasFlashUnit()) "플래시 있음" else "플래시 없음") + "\n" +
                         manualText + " · " + isoText + " · " + shutterText + "\n" +
-                        "화이트밸런스: " + awbNames.joinToString(" · ").ifBlank { "지원 모드 확인 불가" }
+                        "화이트밸런스: " + awbNames.joinToString(" · ").ifBlank { "지원 모드 확인 불가" } + "\n" +
+                        "저조도 부스트: " + if (lowLightSupported) "지원" else "미지원"
                 )
 
                 val zoomState = boundCamera.cameraInfo.zoomState.value
