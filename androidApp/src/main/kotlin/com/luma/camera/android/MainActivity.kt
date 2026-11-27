@@ -262,10 +262,20 @@ private fun LumaCameraApplication() {
         onManualIsoChange = { manualIso = it },
         onManualShutterChange = { manualShutterNs = it },
         onManualExposureToggle = { enabled ->
-            manualExposureEnabled = enabled
-            manualExposureAction?.invoke(enabled, manualIso, manualShutterNs)
+            if (enabled && lowLightBoostEnabled) {
+                captureStatus = "수동 노출을 사용하려면 먼저 저조도 부스트를 해제하세요."
+            } else {
+                manualExposureEnabled = enabled
+                manualExposureAction?.invoke(enabled, manualIso, manualShutterNs)
+            }
         },
-        onApplyManualExposure = { manualExposureAction?.invoke(true, manualIso, manualShutterNs) },
+        onApplyManualExposure = {
+            if (lowLightBoostEnabled) {
+                captureStatus = "수동 노출을 사용하려면 먼저 저조도 부스트를 해제하세요."
+            } else {
+                manualExposureAction?.invoke(true, manualIso, manualShutterNs)
+            }
+        },
         manualFocusSupported = manualFocusSupported,
         manualFocusEnabled = manualFocusEnabled,
         manualFocusDistance = manualFocusDistance,
