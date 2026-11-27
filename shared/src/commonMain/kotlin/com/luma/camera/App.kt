@@ -411,6 +411,7 @@ fun App(
                                     }
                                     Button(
                                         onClick = { onManualExposureToggle(!manualExposureEnabled) },
+                                        enabled = !lowLightBoostEnabled || manualExposureEnabled,
                                         colors = ButtonDefaults.buttonColors(containerColor = if (manualExposureEnabled) Accent else Panel, contentColor = if (manualExposureEnabled) Color(0xFF10170B) else TextMain),
                                         shape = CircleShape
                                     ) { Text(if (manualExposureEnabled) "자동 전환" else "수동 전환") }
