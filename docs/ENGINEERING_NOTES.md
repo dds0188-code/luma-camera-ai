@@ -83,3 +83,12 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - Added a native Android adaptive launcher icon using vector drawables; no HTML, remote image, or WebView is used for the installed app identity.
 - The Android app remains a native Kotlin/Jetpack Compose application using CameraX for live preview, focus, and capture.
 - Manual ISO/shutter/white-balance request controls remain a separate next implementation step; this UI pass does not imply those controls are already available.
+
+
+## Self timer and composition overlay controls
+
+- Added shared supported timer presets (0 / 3 / 10 seconds) with unit tests for allowed values and normalization.
+- Android CameraX capture now supports a native pre-capture countdown. Duplicate capture requests are blocked while counting down or saving; pending callbacks are removed when the camera composable is disposed.
+- Added selectable preview overlays: rule-of-thirds grid, center crosshair, and no overlay. The control strip is horizontally scrollable for narrow phone screens.
+- The timer delays the existing CameraX capture and MediaStore save path; it does not create a web view, remote image dependency, or network requirement.
+- Physical-device validation is still required for shutter timing, lifecycle interruption, and device-specific preview layout.
