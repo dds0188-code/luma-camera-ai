@@ -162,3 +162,11 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - Added Camera2 white-balance presets only for modes listed in the active camera's CONTROL_AWB_AVAILABLE_MODES. This uses AWB mode requests, not manual color-temperature/Kelvin or custom color-correction gains. Lens switching refreshes the supported list.
 - Manual exposure clears Camera2 interop request options; after returning to automatic exposure, the app reapplies the selected white-balance preset and any enabled manual focus setting.
 - CI must pass for shared tests, Android APK assembly, Windows desktop compilation, and MSI packaging before treating this batch as build-verified. Device-level preview overlay alignment and focus usefulness remain unverified until tested on physical phones.
+
+
+## Zebra highlight warning overlay
+
+- Added an opt-in zebra-style highlight guide based on the CameraX Y plane. It samples a 32x24 grid no more often than every 300 ms and marks values at or above luma 245 with a bounded set of up to 360 diagonal strokes.
+- The shared analyzer validates sample count, luminance range, threshold, rotation and output bound. Common tests cover threshold inclusivity, coordinate rotation/front-camera mirroring, invalid samples and output limiting.
+- The overlay is disabled by default and reads the latest Compose toggle state without rebinding the camera. It shares the existing ImageAnalysis executor, KEEP_ONLY_LATEST strategy and analysis busy gate with face detection, scene labeling, histogram and focus peaking.
+- This is a preview-luma warning, not RAW clipping detection or a guarantee of highlight loss in the saved JPEG. The overlay uses normalized analysis-frame coordinates; PreviewView FILL_CENTER crop/scale differences and OEM transforms still require physical-device alignment checks.
