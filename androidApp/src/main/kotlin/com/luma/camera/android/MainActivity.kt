@@ -129,6 +129,9 @@ private fun LumaCameraApplication() {
     var focusPeakingPoints by remember { mutableStateOf(emptyList<FocusPeakingPoint>()) }
     var zebraExposureEnabled by remember { mutableStateOf(false) }
     var zebraMarks by remember { mutableStateOf(emptyList<ZebraMark>()) }
+    var lowLightBoostSupported by remember { mutableStateOf(false) }
+    var lowLightBoostEnabled by remember { mutableStateOf(false) }
+    var lowLightBoostAction by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
     var torchAction by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
     var captureStatus by remember { mutableStateOf("카메라 초기화 중…") }
     var zoomRatio by remember { mutableStateOf(1f) }
@@ -293,6 +296,19 @@ private fun LumaCameraApplication() {
             zebraExposureEnabled = enabled
             if (!enabled) zebraMarks = emptyList()
         },
+        lowLightBoostSupported = lowLightBoostSupported,
+        lowLightBoostEnabled = lowLightBoostEnabled,
+        onLowLightBoostToggle = { enabled ->
+            if (enabled && manualExposureEnabled) {
+                captureStatus = "저조도 부스트를 사용하려면 먼저 수동 노출을 자동으로 전환하세요."
+            } else {
+                if (enabled && torchEnabled) {
+                    torchAction?.invoke(false)
+                    torchEnabled = false
+                }
+                lowLightBoostAction?.invoke(enabled)
+            }
+        },
         horizonTiltDegrees = horizonTilt,
         compositionGuidance = guidance,
         shootingIntent = shootingIntent,
@@ -308,7 +324,10 @@ private fun LumaCameraApplication() {
         recognizedShootingIntent = recognizedShootingIntent,
         onApplyRecognizedScene = { shootingIntent = it },
         torchEnabled = torchEnabled,
-        onTorchToggle = { torchAction?.invoke(it) },
+        onTorchToggle = { enabled ->
+            if (enabled && lowLightBoostEnabled) lowLightBoostEnabled = false
+            torchAction?.invoke(enabled)
+        },
         cameraPreview = {
             if (hasCameraPermission) {
                 CameraPreview(
@@ -354,6 +373,12 @@ private fun LumaCameraApplication() {
                     },
                     onTorchActionAvailable = { torchAction = it },
                     onTorchInfo = { torchEnabled = it },
+                    onLowLightBoostActionAvailable = { lowLightBoostAction = it },
+                    onLowLightBoostSupport = { supported ->
+                        lowLightBoostSupported = supported
+                        if (!supported) lowLightBoostEnabled = false
+                    },
+                    onLowLightBoostState = { enabled -> lowLightBoostEnabled = enabled },
                     onZoomInfo = { current, maximum -> zoomRatio = current; maxZoomRatio = maximum },
                     onExposureInfo = { current, minimum, maximum ->
                         exposureIndex = current; minExposureIndex = minimum; maxExposureIndex = maximum
@@ -412,6 +437,9 @@ private fun CameraPreview(
     onManualExposureSupport: (Boolean, Int, Int) -> Unit,
     onTorchActionAvailable: (((Boolean) -> Unit)?) -> Unit,
     onTorchInfo: (Boolean) -> Unit,
+    onLowLightBoostActionAvailable: (((Boolean) -> Unit)?) -> Unit,
+    onLowLightBoostSupport: (Boolean) -> Unit,
+    onLowLightBoostState: (Boolean) -> Unit,
     onZoomInfo: (Float, Float) -> Unit,
     onExposureInfo: (Int, Int, Int) -> Unit,
     qualityExecutor: java.util.concurrent.ExecutorService,
@@ -773,10 +801,35 @@ private fun CameraPreview(
                     onExposureInfo(safeIndex, exposureRange.lower, exposureRange.upper)
                 }
                 onTorchInfo(false)
+                onLowLightBoostState(false)
+                val lowLightSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM &&
+                    boundCamera.cameraInfo.isLowLightBoostSupported()
+                onLowLightBoostSupport(lowLightSupported)
+                onLowLightBoostActionAvailable { enabled ->
+                    if (!lowLightSupported) {
+                        onCaptureStatus("이 카메라는 저조도 부스트를 지원하지 않습니다.")
+                    } else {
+                        val future = boundCamera.cameraControl.enableLowLightBoostAsync(enabled)
+                        future.addListener({
+                            runCatching { future.get() }
+                                .onSuccess {
+                                    onLowLightBoostState(enabled)
+                                    onCaptureStatus(if (enabled) "저조도 부스트 활성화 · 어두운 환경에서 미리보기 보조" else "저조도 부스트 해제")
+                                }
+                                .onFailure { error ->
+                                    onLowLightBoostState(false)
+                                    onCaptureStatus("저조도 부스트 적용 실패: ${error.localizedMessage ?: "기기 설정 충돌"}")
+                                }
+                        }, mainExecutor)
+                    }
+                }
                 onTorchActionAvailable { enabled ->
                     if (boundCamera.cameraInfo.hasFlashUnit()) {
                         boundCamera.cameraControl.enableTorch(enabled)
-                            .addListener({ onTorchInfo(enabled) }, mainExecutor)
+                            .addListener({
+                                if (enabled) onLowLightBoostState(false)
+                                onTorchInfo(enabled)
+                            }, mainExecutor)
                     }
                 }
                 previewView.setOnTouchListener { _, event ->
@@ -876,6 +929,9 @@ private fun CameraPreview(
                 onManualFocusSupport(false, 0f)
                 onManualExposureSupport(false, 100, 800)
                 onTorchActionAvailable(null)
+                onLowLightBoostActionAvailable(null)
+                onLowLightBoostSupport(false)
+                onLowLightBoostState(false)
                 onCaptureStatus("카메라 연결 실패: ${error.localizedMessage ?: "알 수 없는 오류"}")
                 Log.e(TAG, "Camera binding failed", error)
             }
@@ -898,6 +954,9 @@ private fun CameraPreview(
             onManualFocusSupport(false, 0f)
             onManualExposureSupport(false, 100, 800)
             onTorchActionAvailable(null)
+            onLowLightBoostActionAvailable(null)
+            onLowLightBoostSupport(false)
+            onLowLightBoostState(false)
             previewView.setOnTouchListener(null)
             imageAnalysis?.clearAnalyzer()
             imageAnalysis = null
