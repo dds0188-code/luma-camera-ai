@@ -69,6 +69,8 @@ import com.luma.camera.analysis.ManualExposureOptions
 import com.luma.camera.analysis.ManualFocusOptions
 import com.luma.camera.analysis.ExposureMeterAnalyzer
 import com.luma.camera.analysis.WhiteBalancePreset
+import com.luma.camera.analysis.FocusPeakingAnalyzer
+import com.luma.camera.analysis.FocusPeakingPoint
 import com.luma.camera.analysis.CompositionAnalyzer
 import com.luma.camera.analysis.CompositionInput
 import com.luma.camera.analysis.PhotoQualityAnalyzer
@@ -120,6 +122,8 @@ private fun LumaCameraApplication() {
     var whiteBalanceAction by remember { mutableStateOf<((WhiteBalancePreset) -> Unit)?>(null) }
     var whiteBalancePresets by remember { mutableStateOf(emptyList<WhiteBalancePreset>()) }
     var selectedWhiteBalancePreset by remember { mutableStateOf(WhiteBalancePreset.AUTO) }
+    var focusPeakingEnabled by remember { mutableStateOf(false) }
+    var focusPeakingPoints by remember { mutableStateOf(emptyList<FocusPeakingPoint>()) }
     var torchAction by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
     var captureStatus by remember { mutableStateOf("카메라 초기화 중…") }
     var zoomRatio by remember { mutableStateOf(1f) }
@@ -163,6 +167,7 @@ private fun LumaCameraApplication() {
         whiteBalanceAction = null
         whiteBalancePresets = emptyList()
         selectedWhiteBalancePreset = WhiteBalancePreset.AUTO
+        focusPeakingPoints = emptyList()
     }
 
     val sensorManager = remember(context) { context.getSystemService(SensorManager::class.java) }
@@ -270,6 +275,12 @@ private fun LumaCameraApplication() {
         },
         exposureHistogram = exposureHistogram,
         exposureWarning = exposureWarning,
+        focusPeakingEnabled = focusPeakingEnabled,
+        focusPeakingPoints = focusPeakingPoints,
+        onFocusPeakingToggle = { enabled ->
+            focusPeakingEnabled = enabled
+            if (!enabled) focusPeakingPoints = emptyList()
+        },
         horizonTiltDegrees = horizonTilt,
         compositionGuidance = guidance,
         shootingIntent = shootingIntent,
@@ -312,6 +323,8 @@ private fun LumaCameraApplication() {
                         manualFocusDistance = manualFocusDistance.coerceIn(0f, maximum)
                         if (!supported) manualFocusEnabled = false
                     },
+                    onFocusPeakingPoints = { points -> focusPeakingPoints = points },
+                    focusPeakingEnabled = focusPeakingEnabled,
                     onExposureMeter = { histogram, warning ->
                         exposureHistogram = histogram
                         exposureWarning = warning
@@ -378,6 +391,8 @@ private fun CameraPreview(
     onRestoreWhiteBalance: () -> Unit,
     onManualFocusSupport: (Boolean, Float) -> Unit,
     onExposureMeter: (List<Float>, String) -> Unit,
+    focusPeakingEnabled: Boolean,
+    onFocusPeakingPoints: (List<FocusPeakingPoint>) -> Unit,
     onManualExposureSupport: (Boolean, Int, Int) -> Unit,
     onTorchActionAvailable: (((Boolean) -> Unit)?) -> Unit,
     onTorchInfo: (Boolean) -> Unit,
@@ -424,6 +439,7 @@ private fun CameraPreview(
         val analysisExecutor = Executors.newSingleThreadExecutor()
         var lastSceneLabelTimestamp = 0L
         var lastExposureMeterTimestamp = 0L
+        var lastFocusPeakingTimestamp = 0L
         val listener = Runnable {
             if (isDisposed) return@Runnable
             try {
@@ -464,6 +480,37 @@ private fun CameraPreview(
                                     if (samples.isNotEmpty()) {
                                         val meter = ExposureMeterAnalyzer.analyze(samples)
                                         mainExecutor.execute { if (!isDisposed) onExposureMeter(meter.histogram.map { it.toFloat() }, meter.warning) }
+                                    }
+                                }
+                            }
+                            if (focusPeakingEnabled && meterNow - lastFocusPeakingTimestamp >= 250L) {
+                                lastFocusPeakingTimestamp = meterNow
+                                val plane = proxy.planes.firstOrNull()
+                                if (plane != null) {
+                                    val yBuffer = plane.buffer.duplicate()
+                                    val crop = proxy.cropRect
+                                    val width = 40
+                                    val height = 30
+                                    val samples = ArrayList<Int>(width * height)
+                                    for (row in 0 until height) {
+                                        val y = crop.top + ((row + 0.5) * crop.height() / height).toInt()
+                                        for (column in 0 until width) {
+                                            val x = crop.left + ((column + 0.5) * crop.width() / width).toInt()
+                                            val index = yBuffer.position() + y * plane.rowStride + x * plane.pixelStride
+                                            if (index in 0 until yBuffer.limit()) samples.add(yBuffer.get(index).toInt() and 0xFF)
+                                        }
+                                    }
+                                    if (samples.size == width * height) {
+                                        val points = FocusPeakingAnalyzer.analyze(
+                                            samples = samples,
+                                            width = width,
+                                            height = height,
+                                            threshold = 48,
+                                            rotationDegrees = proxy.imageInfo.rotationDegrees,
+                                            mirrorHorizontally = lensFacing == CameraSelector.LENS_FACING_FRONT,
+                                            maxPoints = 420
+                                        )
+                                        mainExecutor.execute { if (!isDisposed && focusPeakingEnabled) onFocusPeakingPoints(points) }
                                     }
                                 }
                             }
@@ -773,6 +820,8 @@ private fun CameraPreview(
                 onManualFocusActionAvailable(null)
                 onWhiteBalanceActionAvailable(null)
                 onWhiteBalancePresets(emptyList())
+            onFocusPeakingPoints(emptyList())
+                onFocusPeakingPoints(emptyList())
                 onManualFocusSupport(false, 0f)
                 onManualExposureSupport(false, 100, 800)
                 onTorchActionAvailable(null)
