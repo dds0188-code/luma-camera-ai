@@ -68,6 +68,7 @@ import com.luma.camera.analysis.CaptureBurstOptions
 import com.luma.camera.analysis.ManualExposureOptions
 import com.luma.camera.analysis.ManualFocusOptions
 import com.luma.camera.analysis.ExposureMeterAnalyzer
+import com.luma.camera.analysis.WhiteBalancePreset
 import com.luma.camera.analysis.CompositionAnalyzer
 import com.luma.camera.analysis.CompositionInput
 import com.luma.camera.analysis.PhotoQualityAnalyzer
@@ -116,6 +117,9 @@ private fun LumaCameraApplication() {
     var minimumFocusDistance by remember { mutableStateOf(0f) }
     var exposureHistogram by remember { mutableStateOf(emptyList<Float>()) }
     var exposureWarning by remember { mutableStateOf("노출 분포 분석 중…") }
+    var whiteBalanceAction by remember { mutableStateOf<((WhiteBalancePreset) -> Unit)?>(null) }
+    var whiteBalancePresets by remember { mutableStateOf(emptyList<WhiteBalancePreset>()) }
+    var selectedWhiteBalancePreset by remember { mutableStateOf(WhiteBalancePreset.AUTO) }
     var torchAction by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
     var captureStatus by remember { mutableStateOf("카메라 초기화 중…") }
     var zoomRatio by remember { mutableStateOf(1f) }
@@ -156,6 +160,9 @@ private fun LumaCameraApplication() {
         manualFocusEnabled = false
         manualFocusSupported = false
         manualFocusAction = null
+        whiteBalanceAction = null
+        whiteBalancePresets = emptyList()
+        selectedWhiteBalancePreset = WhiteBalancePreset.AUTO
     }
 
     val sensorManager = remember(context) { context.getSystemService(SensorManager::class.java) }
@@ -255,6 +262,12 @@ private fun LumaCameraApplication() {
         },
         onManualFocusDistanceChange = { manualFocusDistance = it },
         onApplyManualFocus = { manualFocusAction?.invoke(true, manualFocusDistance) },
+        whiteBalancePresets = whiteBalancePresets,
+        selectedWhiteBalancePreset = selectedWhiteBalancePreset,
+        onWhiteBalancePresetChange = { preset ->
+            selectedWhiteBalancePreset = preset
+            whiteBalanceAction?.invoke(preset)
+        },
         exposureHistogram = exposureHistogram,
         exposureWarning = exposureWarning,
         horizonTiltDegrees = horizonTilt,
@@ -282,6 +295,14 @@ private fun LumaCameraApplication() {
                     onExposureActionAvailable = { exposureAction = it },
                     onManualExposureActionAvailable = { manualExposureAction = it },
                     onManualFocusActionAvailable = { manualFocusAction = it },
+                    onWhiteBalanceActionAvailable = { whiteBalanceAction = it },
+                    onWhiteBalancePresets = { presets ->
+                        whiteBalancePresets = presets
+                        if (selectedWhiteBalancePreset !in presets) {
+                            selectedWhiteBalancePreset = presets.firstOrNull() ?: WhiteBalancePreset.AUTO
+                        }
+                    },
+                    onRestoreWhiteBalance = { whiteBalanceAction?.invoke(selectedWhiteBalancePreset) },
                     onRestoreManualFocus = { if (manualFocusEnabled) manualFocusAction?.invoke(true, manualFocusDistance) },
                     onManualFocusSupport = { supported, maximum ->
                         manualFocusSupported = supported
@@ -350,6 +371,9 @@ private fun CameraPreview(
     onManualExposureActionAvailable: (((Boolean, Int, Long) -> Unit)?) -> Unit,
     onManualFocusActionAvailable: (((Boolean, Float) -> Unit)?) -> Unit,
     onRestoreManualFocus: () -> Unit,
+    onWhiteBalanceActionAvailable: (((WhiteBalancePreset) -> Unit)?) -> Unit,
+    onWhiteBalancePresets: (List<WhiteBalancePreset>) -> Unit,
+    onRestoreWhiteBalance: () -> Unit,
     onManualFocusSupport: (Boolean, Float) -> Unit,
     onExposureMeter: (List<Float>, String) -> Unit,
     onManualExposureSupport: (Boolean, Int, Int) -> Unit,
@@ -512,6 +536,35 @@ private fun CameraPreview(
                 val manualSensorSupported = capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
                 val minimumFocus = camera2Info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
                 val camera2Control = runCatching { Camera2CameraControl.from(boundCamera.cameraControl) }.getOrNull()
+                val supportedWhiteBalancePresets = awbModes.mapNotNull { mode ->
+                    when (mode) {
+                        CameraCharacteristics.CONTROL_AWB_MODE_AUTO -> WhiteBalancePreset.AUTO
+                        CameraCharacteristics.CONTROL_AWB_MODE_INCANDESCENT -> WhiteBalancePreset.INCANDESCENT
+                        CameraCharacteristics.CONTROL_AWB_MODE_FLUORESCENT -> WhiteBalancePreset.FLUORESCENT
+                        CameraCharacteristics.CONTROL_AWB_MODE_WARM_FLUORESCENT -> WhiteBalancePreset.WARM_FLUORESCENT
+                        CameraCharacteristics.CONTROL_AWB_MODE_DAYLIGHT -> WhiteBalancePreset.DAYLIGHT
+                        CameraCharacteristics.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT -> WhiteBalancePreset.CLOUDY_DAYLIGHT
+                        CameraCharacteristics.CONTROL_AWB_MODE_TWILIGHT -> WhiteBalancePreset.TWILIGHT
+                        CameraCharacteristics.CONTROL_AWB_MODE_SHADE -> WhiteBalancePreset.SHADE
+                        else -> null
+                    }
+                }.distinct()
+                onWhiteBalancePresets(supportedWhiteBalancePresets)
+                onWhiteBalanceActionAvailable { preset ->
+                    if (preset !in supportedWhiteBalancePresets || camera2Control == null) {
+                        onCaptureStatus("선택한 화이트밸런스 모드를 지원하지 않습니다.")
+                    } else {
+                        val options = CaptureRequestOptions.Builder()
+                            .setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, preset.toCamera2Mode())
+                            .build()
+                        val future = camera2Control.addCaptureRequestOptions(options)
+                        future.addListener({
+                            runCatching { future.get() }
+                                .onSuccess { onCaptureStatus("화이트밸런스 적용 · ${preset.label}") }
+                                .onFailure { error -> onCaptureStatus("화이트밸런스 적용 실패: ${error.localizedMessage ?: "카메라 오류"}") }
+                        }, mainExecutor)
+                    }
+                }
                 val manualFocusAvailable = manualSensorSupported && minimumFocus.isFinite() && minimumFocus > 0f && camera2Control != null
                 onManualFocusSupport(manualFocusAvailable, if (manualFocusAvailable) minimumFocus else 0f)
                 val manualExposureAvailable = manualSensorSupported &&
@@ -552,6 +605,7 @@ private fun CameraPreview(
                             runCatching { future.get() }
                                 .onSuccess {
                                     onRestoreManualFocus()
+                                    onRestoreWhiteBalance()
                                     onCaptureStatus("자동 노출 모드로 전환했습니다.")
                                 }
                                 .onFailure { error -> onCaptureStatus("자동 노출 전환 실패: ${error.localizedMessage ?: "카메라 오류"}") }
@@ -715,6 +769,8 @@ private fun CameraPreview(
                 onExposureActionAvailable(null)
                 onManualExposureActionAvailable(null)
                 onManualFocusActionAvailable(null)
+                onWhiteBalanceActionAvailable(null)
+                onWhiteBalancePresets(emptyList())
                 onManualFocusSupport(false, 0f)
                 onManualExposureSupport(false, 100, 800)
                 onTorchActionAvailable(null)
@@ -733,6 +789,8 @@ private fun CameraPreview(
             onExposureActionAvailable(null)
             onManualExposureActionAvailable(null)
             onManualFocusActionAvailable(null)
+            onWhiteBalanceActionAvailable(null)
+            onWhiteBalancePresets(emptyList())
             onManualFocusSupport(false, 0f)
             onManualExposureSupport(false, 100, 800)
             onTorchActionAvailable(null)
@@ -831,4 +889,15 @@ private fun analyzeSavedPhoto(
             mainExecutor.execute { onFailure(message) }
         }
     }
+}
+
+private fun WhiteBalancePreset.toCamera2Mode(): Int = when (this) {
+    WhiteBalancePreset.AUTO -> CameraCharacteristics.CONTROL_AWB_MODE_AUTO
+    WhiteBalancePreset.INCANDESCENT -> CameraCharacteristics.CONTROL_AWB_MODE_INCANDESCENT
+    WhiteBalancePreset.FLUORESCENT -> CameraCharacteristics.CONTROL_AWB_MODE_FLUORESCENT
+    WhiteBalancePreset.WARM_FLUORESCENT -> CameraCharacteristics.CONTROL_AWB_MODE_WARM_FLUORESCENT
+    WhiteBalancePreset.DAYLIGHT -> CameraCharacteristics.CONTROL_AWB_MODE_DAYLIGHT
+    WhiteBalancePreset.CLOUDY_DAYLIGHT -> CameraCharacteristics.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT
+    WhiteBalancePreset.TWILIGHT -> CameraCharacteristics.CONTROL_AWB_MODE_TWILIGHT
+    WhiteBalancePreset.SHADE -> CameraCharacteristics.CONTROL_AWB_MODE_SHADE
 }
