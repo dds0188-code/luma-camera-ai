@@ -308,7 +308,8 @@ fun App(
                                 value = exposureIndex.toFloat().coerceIn(minExposureIndex.toFloat(), maxExposureIndex.toFloat()),
                                 onValueChange = { onExposureChange(it.toInt()) },
                                 valueRange = minExposureIndex.toFloat()..maxExposureIndex.toFloat(),
-                                steps = (maxExposureIndex - minExposureIndex - 1).coerceAtLeast(0)
+                                steps = (maxExposureIndex - minExposureIndex - 1).coerceAtLeast(0),
+                                enabled = !manualExposureEnabled
                             )
                         } else {
                             Text("이 기기에서 노출 보정 범위를 제공하지 않습니다.", color = Muted, style = MaterialTheme.typography.bodySmall)
