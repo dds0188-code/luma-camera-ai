@@ -69,6 +69,9 @@ fun App(
     photoQualitySummary: String = "",
     photoQualityLines: List<String> = emptyList(),
     cameraCapabilitySummary: String = "",
+    sceneRecognitionSummary: String = "",
+    recognizedShootingIntent: ShootingIntent? = null,
+    onApplyRecognizedScene: (ShootingIntent) -> Unit = {},
     torchEnabled: Boolean = false,
     onTorchToggle: (Boolean) -> Unit = {},
     captureTimerSeconds: Int = 0,
@@ -234,6 +237,28 @@ fun App(
                     }
                     adviceLines.take(2).forEach { line ->
                         Text("· $line", color = Muted, style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    if (sceneRecognitionSummary.isNotBlank()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                                .background(PanelRaised).padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("온디바이스 장면 인식", color = Accent, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                Text(sceneRecognitionSummary, color = TextMain, style = MaterialTheme.typography.bodySmall)
+                            }
+                            if (recognizedShootingIntent != null) {
+                                Button(
+                                    onClick = { onApplyRecognizedScene(recognizedShootingIntent) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF10170B)),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 11.dp, vertical = 7.dp),
+                                    shape = CircleShape
+                                ) { Text("모드 적용", style = MaterialTheme.typography.labelSmall) }
+                            }
+                        }
                     }
 
                     Column(
