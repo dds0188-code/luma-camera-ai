@@ -68,7 +68,11 @@ fun App(
     photoQualityLines: List<String> = emptyList(),
     cameraCapabilitySummary: String = "",
     torchEnabled: Boolean = false,
-    onTorchToggle: (Boolean) -> Unit = {}
+    onTorchToggle: (Boolean) -> Unit = {},
+    captureTimerSeconds: Int = 0,
+    onCaptureTimerChange: (Int) -> Unit = {},
+    gridMode: String = "삼분할",
+    onGridModeChange: (String) -> Unit = {}
 ) {
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = Background) {
@@ -121,12 +125,46 @@ fun App(
                     }
                 }
 
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    Text("타이머", color = Muted, style = MaterialTheme.typography.labelSmall)
+                    listOf(0, 3, 10).forEach { seconds ->
+                        val selected = captureTimerSeconds == seconds
+                        Button(
+                            onClick = { onCaptureTimerChange(seconds) },
+                            modifier = Modifier.height(32.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selected) Accent else Panel,
+                                contentColor = if (selected) Color(0xFF10170B) else Muted
+                            ),
+                            shape = CircleShape
+                        ) { Text(if (seconds == 0) "끔" else "${seconds}초", style = MaterialTheme.typography.labelSmall) }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    listOf("삼분할", "중앙", "끄기").forEach { mode ->
+                        val selected = gridMode == mode
+                        Button(
+                            onClick = { onGridModeChange(mode) },
+                            modifier = Modifier.height(32.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selected) PanelRaised else Panel,
+                                contentColor = if (selected) Accent else Muted
+                            ),
+                            shape = CircleShape
+                        ) { Text(mode, style = MaterialTheme.typography.labelSmall) }
+                    }
+                }
                 Box(
                     modifier = Modifier.fillMaxWidth().weight(1.18f)
                         .clip(RoundedCornerShape(25.dp)).background(PanelRaised)
                 ) {
                     cameraPreview()
-                    CompositionGrid(Modifier.fillMaxSize())
+                    CompositionGrid(Modifier.fillMaxSize(), gridMode)
                     Row(
                         modifier = Modifier.align(Alignment.TopStart).padding(12.dp)
                             .clip(CircleShape).background(Color(0x99080B0F)).padding(horizontal = 11.dp, vertical = 7.dp),
@@ -281,15 +319,21 @@ private fun InfoCard(title: String, content: String) {
 }
 
 @Composable
-private fun CompositionGrid(modifier: Modifier = Modifier) {
+private fun CompositionGrid(modifier: Modifier = Modifier, mode: String) {
+    if (mode == "끄기") return
     Canvas(modifier = modifier) {
-        val lineColor = Color.White.copy(alpha = 0.38f)
+        val lineColor = Color.White.copy(alpha = 0.42f)
         val stroke = 1.dp.toPx()
-        for (i in 1..2) {
-            val x = size.width * i / 3f
-            val y = size.height * i / 3f
-            drawLine(lineColor, Offset(x, 0f), Offset(x, size.height), stroke, cap = StrokeCap.Round)
-            drawLine(lineColor, Offset(0f, y), Offset(size.width, y), stroke, cap = StrokeCap.Round)
+        if (mode == "중앙") {
+            drawLine(lineColor, Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), stroke, cap = StrokeCap.Round)
+            drawLine(lineColor, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), stroke, cap = StrokeCap.Round)
+        } else {
+            for (i in 1..2) {
+                val x = size.width * i / 3f
+                val y = size.height * i / 3f
+                drawLine(lineColor, Offset(x, 0f), Offset(x, size.height), stroke, cap = StrokeCap.Round)
+                drawLine(lineColor, Offset(0f, y), Offset(size.width, y), stroke, cap = StrokeCap.Round)
+            }
         }
     }
 }
