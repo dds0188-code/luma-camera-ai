@@ -549,7 +549,6 @@ private fun CameraPreview(
                         else -> null
                     }
                 }.distinct()
-                onWhiteBalancePresets(supportedWhiteBalancePresets)
                 onWhiteBalanceActionAvailable { preset ->
                     if (preset !in supportedWhiteBalancePresets || camera2Control == null) {
                         onCaptureStatus("선택한 화이트밸런스 모드를 지원하지 않습니다.")
@@ -565,6 +564,7 @@ private fun CameraPreview(
                         }, mainExecutor)
                     }
                 }
+                onWhiteBalancePresets(supportedWhiteBalancePresets)
                 val manualFocusAvailable = manualSensorSupported && minimumFocus.isFinite() && minimumFocus > 0f && camera2Control != null
                 onManualFocusSupport(manualFocusAvailable, if (manualFocusAvailable) minimumFocus else 0f)
                 val manualExposureAvailable = manualSensorSupported &&
