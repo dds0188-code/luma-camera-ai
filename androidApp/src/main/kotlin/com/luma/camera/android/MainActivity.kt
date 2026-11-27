@@ -299,7 +299,9 @@ private fun LumaCameraApplication() {
                     onWhiteBalancePresets = { presets ->
                         whiteBalancePresets = presets
                         if (selectedWhiteBalancePreset !in presets) {
-                            selectedWhiteBalancePreset = presets.firstOrNull() ?: WhiteBalancePreset.AUTO
+                            val fallback = presets.firstOrNull() ?: WhiteBalancePreset.AUTO
+                            selectedWhiteBalancePreset = fallback
+                            if (fallback in presets) whiteBalanceAction?.invoke(fallback)
                         }
                     },
                     onRestoreWhiteBalance = { whiteBalanceAction?.invoke(selectedWhiteBalancePreset) },
