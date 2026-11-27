@@ -121,3 +121,12 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - Face bounding-box normalization now accounts for 90°/270° image rotation and mirrors the horizontal coordinate for the front-facing preview.
 - The face detector and bundled image labeler are keyed to the selected lens. This avoids reusing ML Kit clients after they have been closed when `DisposableEffect` restarts during camera switching.
 - Switching cameras triggers full disposal of the old analysis executor and camera use cases before the new lens is bound.
+
+
+## CameraX 1.6.2 compatibility and lifecycle audit
+
+- Unified CameraX dependencies across the Android app and shared Android target at stable version 1.6.2.
+- This upgrade addresses Google's notice that CameraX Extensions support is removed on some devices for applications using CameraX 1.5 or lower starting November 1, 2026. CameraX 1.6 and later retain Extensions support.
+- CameraX Extensions are a future candidate for OEM-provided Night, HDR, Auto, Bokeh, and Face Retouch modes. They are not enabled yet: ExtensionSessionConfig does not support ImageAnalysis, so live face/scene analysis must be paused or redesigned while a vendor extension session is active.
+- Hardened camera disposal: clear the ImageAnalysis analyzer, unbind the active provider, then shut down its dedicated executor and close ML Kit clients. This reduces the chance of analyzer callbacks being submitted to an already-shutdown executor during lens switching or screen disposal.
+- The 1.6.2 Android build and Windows compile were observed successful in CI for the dependency-upgrade commit; the subsequent lifecycle-order change still requires its own final CI confirmation.
