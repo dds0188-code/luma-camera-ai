@@ -538,7 +538,7 @@ private fun CameraPreview(
                 val manualSensorSupported = capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
                 val minimumFocus = camera2Info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
                 val camera2Control = runCatching { Camera2CameraControl.from(boundCamera.cameraControl) }.getOrNull()
-                val supportedWhiteBalancePresets = awbModes.mapNotNull { mode ->
+                val supportedWhiteBalancePresets = awbModes.toList().mapNotNull { mode ->
                     when (mode) {
                         CameraCharacteristics.CONTROL_AWB_MODE_AUTO -> WhiteBalancePreset.AUTO
                         CameraCharacteristics.CONTROL_AWB_MODE_INCANDESCENT -> WhiteBalancePreset.INCANDESCENT
