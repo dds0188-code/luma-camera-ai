@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.luma.camera.analysis.ShootingIntent
+import com.luma.camera.analysis.CaptureTimerOptions
 import kotlin.math.abs
 
 private val Background = Color(0xFF080B0F)
@@ -126,12 +127,12 @@ fun App(
                 }
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                     Text("타이머", color = Muted, style = MaterialTheme.typography.labelSmall)
-                    listOf(0, 3, 10).forEach { seconds ->
+                    CaptureTimerOptions.seconds.forEach { seconds ->
                         val selected = captureTimerSeconds == seconds
                         Button(
                             onClick = { onCaptureTimerChange(seconds) },
