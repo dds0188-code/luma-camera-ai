@@ -476,9 +476,9 @@ private fun CameraPreview(
                     ?: intArrayOf()
                 val manualSensorSupported = capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
                 val minimumFocus = camera2Info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
-                val manualFocusAvailable = manualSensorSupported && minimumFocus > 0f
-                onManualFocusSupport(manualFocusAvailable, minimumFocus)
                 val camera2Control = runCatching { Camera2CameraControl.from(boundCamera.cameraControl) }.getOrNull()
+                val manualFocusAvailable = manualSensorSupported && minimumFocus.isFinite() && minimumFocus > 0f && camera2Control != null
+                onManualFocusSupport(manualFocusAvailable, if (manualFocusAvailable) minimumFocus else 0f)
                 val manualExposureAvailable = manualSensorSupported &&
                     isoRange != null && isoRange.lower > 0 &&
                     shutterRange != null && shutterRange.lower > 0 &&
@@ -515,7 +515,10 @@ private fun CameraPreview(
                         val future = camera2Control.clearCaptureRequestOptions()
                         future.addListener({
                             runCatching { future.get() }
-                                .onSuccess { onCaptureStatus("자동 노출 모드로 전환했습니다.") }
+                                .onSuccess {
+                                    if (manualFocusEnabled) manualFocusAction?.invoke(true, manualFocusDistance)
+                                    else onCaptureStatus("자동 노출 모드로 전환했습니다.")
+                                }
                                 .onFailure { error -> onCaptureStatus("자동 노출 전환 실패: ${error.localizedMessage ?: "카메라 오류"}") }
                         }, mainExecutor)
                     } else {
