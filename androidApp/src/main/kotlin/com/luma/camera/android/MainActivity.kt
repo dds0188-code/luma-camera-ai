@@ -490,6 +490,7 @@ private fun CameraPreview(
         var boundProvider: ProcessCameraProvider? = null
         var isCapturing = false
         var isDisposed = false
+        var lowLightRequestId = 0L
         val timerHandler = Handler(Looper.getMainLooper())
         var countdownRunnable: Runnable? = null
         val analysisBusy = AtomicBoolean(false)
@@ -782,17 +783,21 @@ private fun CameraPreview(
                     if (!lowLightSupported) {
                         onCaptureStatus("이 카메라는 저조도 부스트를 지원하지 않습니다.")
                     } else {
+                        val requestId = ++lowLightRequestId
                         val future = boundCamera.cameraControl.enableLowLightBoostAsync(enabled)
                         future.addListener({
-                            runCatching { future.get() }
-                                .onSuccess {
-                                    onLowLightBoostState(enabled)
-                                    onCaptureStatus(if (enabled) "저조도 부스트 활성화 · 어두운 환경에서 미리보기 보조" else "저조도 부스트 해제")
-                                }
-                                .onFailure { error ->
-                                    onLowLightBoostState(false)
-                                    onCaptureStatus("저조도 부스트 적용 실패: ${error.localizedMessage ?: "기기 설정 충돌"}")
-                                }
+                            val result = runCatching { future.get() }
+                            if (!isDisposed && requestId == lowLightRequestId) {
+                                result
+                                    .onSuccess {
+                                        onLowLightBoostState(enabled)
+                                        onCaptureStatus(if (enabled) "저조도 부스트 활성화 · 어두운 환경에서 미리보기 보조" else "저조도 부스트 해제")
+                                    }
+                                    .onFailure { error ->
+                                        onLowLightBoostState(false)
+                                        onCaptureStatus("저조도 부스트 적용 실패: ${error.localizedMessage ?: "기기 설정 충돌"}")
+                                    }
+                            }
                         }, mainExecutor)
                     }
                 }
