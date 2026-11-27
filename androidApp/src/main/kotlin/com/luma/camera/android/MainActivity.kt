@@ -54,6 +54,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.luma.camera.App
+import com.luma.camera.analysis.CaptureTimerOptions
 import com.luma.camera.analysis.CompositionAnalyzer
 import com.luma.camera.analysis.CompositionInput
 import com.luma.camera.analysis.PhotoQualityAnalyzer
@@ -440,7 +441,7 @@ private fun CameraPreview(
                         onCaptureStatus("카운트다운 또는 촬영이 이미 진행 중입니다.")
                     } else {
                         isCapturing = true
-                        val safeDelay = delaySeconds.coerceIn(0, 10)
+                        val safeDelay = CaptureTimerOptions.normalize(delaySeconds)
                         if (safeDelay == 0) {
                             captureNow()
                         } else {
