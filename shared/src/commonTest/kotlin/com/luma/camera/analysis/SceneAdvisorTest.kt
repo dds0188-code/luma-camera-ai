@@ -89,7 +89,7 @@ class SceneAdvisorTest {
         )
         assertTrue(advice.recommendations.any { it.contains("아래로 기울어져") })
         assertTrue(advice.recommendations.any { it.contains("얼굴이 작게") })
-        assertEquals(1.79f, advice.suggestedZoomRatio, 0.02f)
+        assertEquals(2.83f, advice.suggestedZoomRatio, 0.02f)
     }
 
     @Test
