@@ -72,6 +72,8 @@ import com.luma.camera.analysis.ExposureMeterAnalyzer
 import com.luma.camera.analysis.WhiteBalancePreset
 import com.luma.camera.analysis.FocusPeakingAnalyzer
 import com.luma.camera.analysis.FocusPeakingPoint
+import com.luma.camera.analysis.ZebraExposureAnalyzer
+import com.luma.camera.analysis.ZebraMark
 import com.luma.camera.analysis.CompositionAnalyzer
 import com.luma.camera.analysis.CompositionInput
 import com.luma.camera.analysis.PhotoQualityAnalyzer
@@ -125,6 +127,8 @@ private fun LumaCameraApplication() {
     var selectedWhiteBalancePreset by remember { mutableStateOf(WhiteBalancePreset.AUTO) }
     var focusPeakingEnabled by remember { mutableStateOf(false) }
     var focusPeakingPoints by remember { mutableStateOf(emptyList<FocusPeakingPoint>()) }
+    var zebraExposureEnabled by remember { mutableStateOf(false) }
+    var zebraMarks by remember { mutableStateOf(emptyList<ZebraMark>()) }
     var torchAction by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
     var captureStatus by remember { mutableStateOf("카메라 초기화 중…") }
     var zoomRatio by remember { mutableStateOf(1f) }
@@ -169,6 +173,7 @@ private fun LumaCameraApplication() {
         whiteBalancePresets = emptyList()
         selectedWhiteBalancePreset = WhiteBalancePreset.AUTO
         focusPeakingPoints = emptyList()
+        zebraMarks = emptyList()
     }
 
     val sensorManager = remember(context) { context.getSystemService(SensorManager::class.java) }
@@ -282,6 +287,12 @@ private fun LumaCameraApplication() {
             focusPeakingEnabled = enabled
             if (!enabled) focusPeakingPoints = emptyList()
         },
+        zebraExposureEnabled = zebraExposureEnabled,
+        zebraMarks = zebraMarks,
+        onZebraExposureToggle = { enabled ->
+            zebraExposureEnabled = enabled
+            if (!enabled) zebraMarks = emptyList()
+        },
         horizonTiltDegrees = horizonTilt,
         compositionGuidance = guidance,
         shootingIntent = shootingIntent,
@@ -326,6 +337,8 @@ private fun LumaCameraApplication() {
                     },
                     onFocusPeakingPoints = { points -> focusPeakingPoints = points },
                     focusPeakingEnabled = focusPeakingEnabled,
+                    zebraExposureEnabled = zebraExposureEnabled,
+                    onZebraMarks = { marks -> zebraMarks = marks },
                     onExposureMeter = { histogram, warning ->
                         exposureHistogram = histogram
                         exposureWarning = warning
@@ -394,6 +407,8 @@ private fun CameraPreview(
     onExposureMeter: (List<Float>, String) -> Unit,
     focusPeakingEnabled: Boolean,
     onFocusPeakingPoints: (List<FocusPeakingPoint>) -> Unit,
+    zebraExposureEnabled: Boolean,
+    onZebraMarks: (List<ZebraMark>) -> Unit,
     onManualExposureSupport: (Boolean, Int, Int) -> Unit,
     onTorchActionAvailable: (((Boolean) -> Unit)?) -> Unit,
     onTorchInfo: (Boolean) -> Unit,
@@ -411,6 +426,7 @@ private fun CameraPreview(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentFocusPeakingEnabled by rememberUpdatedState(focusPeakingEnabled)
+    val currentZebraExposureEnabled by rememberUpdatedState(zebraExposureEnabled)
     val mainExecutor = remember(context) { ContextCompat.getMainExecutor(context) }
     val previewView = remember {
         PreviewView(context).apply {
@@ -442,6 +458,7 @@ private fun CameraPreview(
         var lastSceneLabelTimestamp = 0L
         var lastExposureMeterTimestamp = 0L
         var lastFocusPeakingTimestamp = 0L
+        var lastZebraTimestamp = 0L
         val listener = Runnable {
             if (isDisposed) return@Runnable
             try {
@@ -513,6 +530,38 @@ private fun CameraPreview(
                                             maxPoints = 420
                                         )
                                         mainExecutor.execute { if (!isDisposed && currentFocusPeakingEnabled) onFocusPeakingPoints(points) }
+                                    }
+                                }
+                            }
+
+                            if (currentZebraExposureEnabled && meterNow - lastZebraTimestamp >= 300L) {
+                                lastZebraTimestamp = meterNow
+                                val plane = proxy.planes.firstOrNull()
+                                if (plane != null) {
+                                    val yBuffer = plane.buffer.duplicate()
+                                    val crop = proxy.cropRect
+                                    val width = 32
+                                    val height = 24
+                                    val samples = ArrayList<Int>(width * height)
+                                    for (row in 0 until height) {
+                                        val y = crop.top + ((row + 0.5) * crop.height() / height).toInt()
+                                        for (column in 0 until width) {
+                                            val x = crop.left + ((column + 0.5) * crop.width() / width).toInt()
+                                            val index = yBuffer.position() + y * plane.rowStride + x * plane.pixelStride
+                                            if (index in 0 until yBuffer.limit()) samples.add(yBuffer.get(index).toInt() and 0xFF)
+                                        }
+                                    }
+                                    if (samples.size == width * height) {
+                                        val marks = ZebraExposureAnalyzer.analyze(
+                                            samples = samples,
+                                            width = width,
+                                            height = height,
+                                            threshold = 245,
+                                            rotationDegrees = proxy.imageInfo.rotationDegrees,
+                                            mirrorHorizontally = lensFacing == CameraSelector.LENS_FACING_FRONT,
+                                            maxMarks = 360
+                                        )
+                                        mainExecutor.execute { if (!isDisposed && currentZebraExposureEnabled) onZebraMarks(marks) }
                                     }
                                 }
                             }
