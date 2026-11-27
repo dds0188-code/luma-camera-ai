@@ -510,7 +510,7 @@ private fun saveCapture(
     onFailure: (String) -> Unit
 ) {
     val resolver = context.contentResolver
-    val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+    val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
     val values = ContentValues().apply {
         put(MediaStore.Images.Media.DISPLAY_NAME, "LUMA_$timestamp.jpg")
         put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
