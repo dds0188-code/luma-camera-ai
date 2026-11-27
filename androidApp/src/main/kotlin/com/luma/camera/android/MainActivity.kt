@@ -32,6 +32,7 @@ import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CameraCharacteristics
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -521,86 +522,47 @@ private fun CameraPreview(
                             val meterNow = SystemClock.elapsedRealtime()
                             if (meterNow - lastExposureMeterTimestamp >= 350L) {
                                 lastExposureMeterTimestamp = meterNow
-                                val plane = proxy.planes.firstOrNull()
-                                if (plane != null) {
-                                    val yBuffer = plane.buffer.duplicate()
-                                    val crop = proxy.cropRect
-                                    val samples = ArrayList<Int>(24 * 14)
-                                    for (row in 0 until 14) {
-                                        val y = crop.top + ((row + 0.5) * crop.height() / 14).toInt()
-                                        for (column in 0 until 24) {
-                                            val x = crop.left + ((column + 0.5) * crop.width() / 24).toInt()
-                                            val index = yBuffer.position() + y * plane.rowStride + x * plane.pixelStride
-                                            if (index in 0 until yBuffer.limit()) samples.add(yBuffer.get(index).toInt() and 0xFF)
-                                        }
-                                    }
-                                    if (samples.isNotEmpty()) {
-                                        val meter = ExposureMeterAnalyzer.analyze(samples)
-                                        mainExecutor.execute { if (!isDisposed) onExposureMeter(meter.histogram.map { it.toFloat() }, meter.warning) }
-                                    }
+                                val samples = sampleLumaGrid(proxy, 24, 14)
+                                if (samples.isNotEmpty()) {
+                                    val meter = ExposureMeterAnalyzer.analyze(samples)
+                                    mainExecutor.execute { if (!isDisposed) onExposureMeter(meter.histogram.map { it.toFloat() }, meter.warning) }
                                 }
                             }
                             if (currentFocusPeakingEnabled && meterNow - lastFocusPeakingTimestamp >= 250L) {
                                 lastFocusPeakingTimestamp = meterNow
-                                val plane = proxy.planes.firstOrNull()
-                                if (plane != null) {
-                                    val yBuffer = plane.buffer.duplicate()
-                                    val crop = proxy.cropRect
-                                    val width = 40
-                                    val height = 30
-                                    val samples = ArrayList<Int>(width * height)
-                                    for (row in 0 until height) {
-                                        val y = crop.top + ((row + 0.5) * crop.height() / height).toInt()
-                                        for (column in 0 until width) {
-                                            val x = crop.left + ((column + 0.5) * crop.width() / width).toInt()
-                                            val index = yBuffer.position() + y * plane.rowStride + x * plane.pixelStride
-                                            if (index in 0 until yBuffer.limit()) samples.add(yBuffer.get(index).toInt() and 0xFF)
-                                        }
-                                    }
-                                    if (samples.size == width * height) {
-                                        val points = FocusPeakingAnalyzer.analyze(
-                                            samples = samples,
-                                            width = width,
-                                            height = height,
-                                            threshold = 48,
-                                            rotationDegrees = proxy.imageInfo.rotationDegrees,
-                                            mirrorHorizontally = lensFacing == CameraSelector.LENS_FACING_FRONT,
-                                            maxPoints = 420
-                                        )
-                                        mainExecutor.execute { if (!isDisposed && currentFocusPeakingEnabled) onFocusPeakingPoints(points) }
-                                    }
+                                val width = 40
+                                val height = 30
+                                val samples = sampleLumaGrid(proxy, width, height)
+                                if (samples.size == width * height) {
+                                    val points = FocusPeakingAnalyzer.analyze(
+                                        samples = samples,
+                                        width = width,
+                                        height = height,
+                                        threshold = 48,
+                                        rotationDegrees = proxy.imageInfo.rotationDegrees,
+                                        mirrorHorizontally = lensFacing == CameraSelector.LENS_FACING_FRONT,
+                                        maxPoints = 420
+                                    )
+                                    mainExecutor.execute { if (!isDisposed && currentFocusPeakingEnabled) onFocusPeakingPoints(points) }
                                 }
                             }
 
                             if (currentZebraExposureEnabled && meterNow - lastZebraTimestamp >= 300L) {
                                 lastZebraTimestamp = meterNow
-                                val plane = proxy.planes.firstOrNull()
-                                if (plane != null) {
-                                    val yBuffer = plane.buffer.duplicate()
-                                    val crop = proxy.cropRect
-                                    val width = 32
-                                    val height = 24
-                                    val samples = ArrayList<Int>(width * height)
-                                    for (row in 0 until height) {
-                                        val y = crop.top + ((row + 0.5) * crop.height() / height).toInt()
-                                        for (column in 0 until width) {
-                                            val x = crop.left + ((column + 0.5) * crop.width() / width).toInt()
-                                            val index = yBuffer.position() + y * plane.rowStride + x * plane.pixelStride
-                                            if (index in 0 until yBuffer.limit()) samples.add(yBuffer.get(index).toInt() and 0xFF)
-                                        }
-                                    }
-                                    if (samples.size == width * height) {
-                                        val marks = ZebraExposureAnalyzer.analyze(
-                                            samples = samples,
-                                            width = width,
-                                            height = height,
-                                            threshold = 245,
-                                            rotationDegrees = proxy.imageInfo.rotationDegrees,
-                                            mirrorHorizontally = lensFacing == CameraSelector.LENS_FACING_FRONT,
-                                            maxMarks = 360
-                                        )
-                                        mainExecutor.execute { if (!isDisposed && currentZebraExposureEnabled) onZebraMarks(marks) }
-                                    }
+                                val width = 32
+                                val height = 24
+                                val samples = sampleLumaGrid(proxy, width, height)
+                                if (samples.size == width * height) {
+                                    val marks = ZebraExposureAnalyzer.analyze(
+                                        samples = samples,
+                                        width = width,
+                                        height = height,
+                                        threshold = 245,
+                                        rotationDegrees = proxy.imageInfo.rotationDegrees,
+                                        mirrorHorizontally = lensFacing == CameraSelector.LENS_FACING_FRONT,
+                                        maxMarks = 360
+                                    )
+                                    mainExecutor.execute { if (!isDisposed && currentZebraExposureEnabled) onZebraMarks(marks) }
                                 }
                             }
                             val faceTask = detector.process(input)
@@ -980,6 +942,37 @@ private fun CameraPreview(
         }
     }
     AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+}
+
+
+/**
+ * Samples the first (Y/luma) plane over the ImageProxy crop rectangle.
+ * Uses absolute ByteBuffer reads and long index arithmetic so padded row/pixel
+ * strides and non-zero buffer positions are handled without reading past limit.
+ */
+private fun sampleLumaGrid(proxy: ImageProxy, width: Int, height: Int): List<Int> {
+    if (width <= 0 || height <= 0) return emptyList()
+    val plane = proxy.planes.firstOrNull() ?: return emptyList()
+    if (plane.rowStride <= 0 || plane.pixelStride <= 0) return emptyList()
+    val crop = proxy.cropRect
+    if (crop.width() <= 0 || crop.height() <= 0) return emptyList()
+
+    val buffer = plane.buffer.duplicate()
+    val base = buffer.position().toLong()
+    val result = ArrayList<Int>(width * height)
+    for (row in 0 until height) {
+        val y = (crop.top + ((row + 0.5) * crop.height() / height).toInt())
+            .coerceIn(crop.top, crop.bottom - 1)
+        for (column in 0 until width) {
+            val x = (crop.left + ((column + 0.5) * crop.width() / width).toInt())
+                .coerceIn(crop.left, crop.right - 1)
+            val index = base + y.toLong() * plane.rowStride + x.toLong() * plane.pixelStride
+            if (index >= 0L && index < buffer.limit().toLong()) {
+                result.add(buffer.get(index.toInt()).toInt() and 0xFF)
+            }
+        }
+    }
+    return result
 }
 
 private fun saveCapture(
