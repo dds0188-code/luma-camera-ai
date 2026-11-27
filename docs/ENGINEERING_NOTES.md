@@ -130,3 +130,13 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - CameraX Extensions are a future candidate for OEM-provided Night, HDR, Auto, Bokeh, and Face Retouch modes. They are not enabled yet: ExtensionSessionConfig does not support ImageAnalysis, so live face/scene analysis must be paused or redesigned while a vendor extension session is active.
 - Hardened camera disposal: clear the ImageAnalysis analyzer, unbind the active provider, then shut down its dedicated executor and close ML Kit clients. This reduces the chance of analyzer callbacks being submitted to an already-shutdown executor during lens switching or screen disposal.
 - The 1.6.2 Android build and Windows compile were observed successful in CI for the dependency-upgrade commit; the subsequent lifecycle-order change still requires its own final CI confirmation.
+
+
+## Camera2 manual exposure controls
+
+- Added an opt-in manual exposure panel only when the active camera advertises `REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR` and both ISO and exposure-time ranges are present.
+- Manual mode applies `CONTROL_AE_MODE_OFF`, `SENSOR_SENSITIVITY`, and `SENSOR_EXPOSURE_TIME` together through CameraX's Camera2 interop control. This is applied to the active CameraX camera control; the app does not open or manage CameraDevice directly.
+- ISO and shutter requests are clamped to the active camera's reported hardware ranges. The shared `ManualExposureOptions` helpers validate ranges and are covered by common tests.
+- Automatic mode clears the interop request options. The exposure-compensation slider is disabled while manual exposure is active because AE compensation is not meaningful with AE disabled.
+- Switching between front/rear cameras resets manual exposure mode to Auto; each lens is independently capability-checked. No support is assumed from a different camera.
+- Device-specific caveat: the app build can validate API usage but cannot guarantee a particular OEM camera HAL accepts manual requests. Physical validation is still required on each target phone/lens. Unsupported cameras keep the manual panel hidden.
