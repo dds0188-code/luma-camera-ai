@@ -136,6 +136,7 @@ private fun LumaCameraApplication() {
     var torchAction by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
     var captureStatus by remember { mutableStateOf("카메라 초기화 중…") }
     var zoomRatio by remember { mutableStateOf(1f) }
+    var minZoomRatio by remember { mutableStateOf(1f) }
     var maxZoomRatio by remember { mutableStateOf(1f) }
     var exposureIndex by remember { mutableStateOf(0) }
     var minExposureIndex by remember { mutableStateOf(0) }
@@ -225,6 +226,7 @@ private fun LumaCameraApplication() {
             subjectAreaRatio = faceArea,
             horizonTiltDegrees = horizonTilt.toDouble(),
             currentZoomRatio = zoomRatio,
+            minZoomRatio = minZoomRatio,
             maxZoomRatio = maxZoomRatio,
             cameraPitchDegrees = cameraPitchDegrees.toDouble()
         )
@@ -254,6 +256,7 @@ private fun LumaCameraApplication() {
         onGridModeChange = { gridMode = it },
         captureStatus = captureStatus,
         zoomRatio = zoomRatio,
+        minZoomRatio = minZoomRatio,
         maxZoomRatio = maxZoomRatio,
         onZoomChange = { zoomAction?.invoke(it) },
         exposureIndex = exposureIndex,
@@ -389,7 +392,7 @@ private fun LumaCameraApplication() {
                         if (!supported) lowLightBoostEnabled = false
                     },
                     onLowLightBoostState = { enabled -> lowLightBoostEnabled = enabled },
-                    onZoomInfo = { current, maximum -> zoomRatio = current; maxZoomRatio = maximum },
+                    onZoomInfo = { current, minimum, maximum -> zoomRatio = current; minZoomRatio = minimum; maxZoomRatio = maximum },
                     onExposureInfo = { current, minimum, maximum ->
                         exposureIndex = current; minExposureIndex = minimum; maxExposureIndex = maximum
                     },
@@ -450,7 +453,7 @@ private fun CameraPreview(
     onLowLightBoostActionAvailable: (((Boolean) -> Unit)?) -> Unit,
     onLowLightBoostSupport: (Boolean) -> Unit,
     onLowLightBoostState: (Boolean) -> Unit,
-    onZoomInfo: (Float, Float) -> Unit,
+    onZoomInfo: (Float, Float, Float) -> Unit,
     onExposureInfo: (Int, Int, Int) -> Unit,
     qualityExecutor: java.util.concurrent.ExecutorService,
     lensFacing: Int,
@@ -760,13 +763,14 @@ private fun CameraPreview(
                 )
 
                 val zoomState = boundCamera.cameraInfo.zoomState.value
-                val maxZoom = zoomState?.maxZoomRatio ?: 1f
-                val currentZoom = zoomState?.zoomRatio ?: 1f
-                onZoomInfo(currentZoom, maxZoom)
+                val minZoom = (zoomState?.minZoomRatio ?: 1f).coerceAtLeast(0.1f)
+                val maxZoom = (zoomState?.maxZoomRatio ?: 1f).coerceAtLeast(minZoom)
+                val currentZoom = zoomState?.zoomRatio?.coerceIn(minZoom, maxZoom) ?: minZoom
+                onZoomInfo(currentZoom, minZoom, maxZoom)
                 onZoomActionAvailable { ratio ->
-                    val safeRatio = ratio.coerceIn(1f, maxZoom)
+                    val safeRatio = ratio.takeIf { it.isFinite() }?.coerceIn(minZoom, maxZoom) ?: minZoom
                     boundCamera.cameraControl.setZoomRatio(safeRatio)
-                    onZoomInfo(safeRatio, maxZoom)
+                    onZoomInfo(safeRatio, minZoom, maxZoom)
                 }
                 val exposureRange = boundCamera.cameraInfo.exposureState.exposureCompensationRange
                 val currentExposure = boundCamera.cameraInfo.exposureState.exposureCompensationIndex
