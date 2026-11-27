@@ -47,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -409,6 +410,7 @@ private fun CameraPreview(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val currentFocusPeakingEnabled by rememberUpdatedState(focusPeakingEnabled)
     val mainExecutor = remember(context) { ContextCompat.getMainExecutor(context) }
     val previewView = remember {
         PreviewView(context).apply {
@@ -483,7 +485,7 @@ private fun CameraPreview(
                                     }
                                 }
                             }
-                            if (focusPeakingEnabled && meterNow - lastFocusPeakingTimestamp >= 250L) {
+                            if (currentFocusPeakingEnabled && meterNow - lastFocusPeakingTimestamp >= 250L) {
                                 lastFocusPeakingTimestamp = meterNow
                                 val plane = proxy.planes.firstOrNull()
                                 if (plane != null) {
@@ -510,7 +512,7 @@ private fun CameraPreview(
                                             mirrorHorizontally = lensFacing == CameraSelector.LENS_FACING_FRONT,
                                             maxPoints = 420
                                         )
-                                        mainExecutor.execute { if (!isDisposed && focusPeakingEnabled) onFocusPeakingPoints(points) }
+                                        mainExecutor.execute { if (!isDisposed && currentFocusPeakingEnabled) onFocusPeakingPoints(points) }
                                     }
                                 }
                             }
