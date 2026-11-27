@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.luma.camera.analysis.ShootingIntent
 import com.luma.camera.analysis.CaptureTimerOptions
+import com.luma.camera.analysis.CaptureBurstOptions
 import kotlin.math.abs
 
 private val Background = Color(0xFF080B0F)
@@ -72,6 +73,8 @@ fun App(
     onTorchToggle: (Boolean) -> Unit = {},
     captureTimerSeconds: Int = 0,
     onCaptureTimerChange: (Int) -> Unit = {},
+    captureBurstCount: Int = 1,
+    onCaptureBurstCountChange: (Int) -> Unit = {},
     gridMode: String = "삼분할",
     onGridModeChange: (String) -> Unit = {}
 ) {
@@ -144,6 +147,20 @@ fun App(
                             ),
                             shape = CircleShape
                         ) { Text(if (seconds == 0) "끔" else "${seconds}초", style = MaterialTheme.typography.labelSmall) }
+                    }
+                    Text("연사", color = Muted, style = MaterialTheme.typography.labelSmall)
+                    CaptureBurstOptions.counts.forEach { count ->
+                        val selected = captureBurstCount == count
+                        Button(
+                            onClick = { onCaptureBurstCountChange(count) },
+                            modifier = Modifier.height(32.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selected) Accent else Panel,
+                                contentColor = if (selected) Color(0xFF10170B) else Muted
+                            ),
+                            shape = CircleShape
+                        ) { Text(if (count == 1) "1장" else "${count}연사", style = MaterialTheme.typography.labelSmall) }
                     }
                     Spacer(Modifier.weight(1f))
                     listOf("삼분할", "중앙", "끄기").forEach { mode ->
