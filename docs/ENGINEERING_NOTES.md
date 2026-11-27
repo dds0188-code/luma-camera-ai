@@ -113,3 +113,11 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - The UI presents a candidate and confidence; the user explicitly applies the recommended shooting profile. This is not a claim of fully reliable scene understanding or generic object segmentation.
 - The model is bundled to preserve offline-first behavior. No captured frame is uploaded.
 - Physical-device performance, thermal impact, category accuracy, and low-light behavior still require validation.
+
+
+## Camera switching and analyzer lifecycle hardening
+
+- Added front/rear lens switching through CameraX `CameraSelector` and lifecycle re-binding. The active camera is checked with `ProcessCameraProvider.hasCamera` before binding.
+- Face bounding-box normalization now accounts for 90°/270° image rotation and mirrors the horizontal coordinate for the front-facing preview.
+- The face detector and bundled image labeler are keyed to the selected lens. This avoids reusing ML Kit clients after they have been closed when `DisposableEffect` restarts during camera switching.
+- Switching cameras triggers full disposal of the old analysis executor and camera use cases before the new lens is bound.
