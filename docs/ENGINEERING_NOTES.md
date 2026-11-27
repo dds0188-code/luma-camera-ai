@@ -185,3 +185,11 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - Histogram, focus peaking and zebra now use one Android helper to sample the Y plane over ImageProxy.cropRect. It respects rowStride, pixelStride, ByteBuffer position/limit and uses long arithmetic for byte offsets; invalid plane/crop metadata yields an empty sample set rather than an out-of-bounds read.
 - The previous Zebra patch had added the rendering references but omitted the corresponding state/callback parameters from the shared Compose App signature. Those parameters are now explicitly declared, alongside the low-light boost controls.
 - CameraX low-light boost future completions are guarded by a monotonically increasing request id so a stale failure from a rapid toggle cannot overwrite a newer state. The torch-off request is awaited before enabling boost, torch state is only updated after its future succeeds, and camera/lens disposal clears the capability and action state.
+
+
+## Live photographer direction v2
+- The scene advisor now consumes a display-relative pitch estimate from the Android rotation-vector sensor in addition to face center/area, roll, and zoom capabilities.
+- When the bundled on-device image labeler yields a confident scene classification, that scene intent is used immediately for live advice; the manual intent remains the fallback when classification is uncertain.
+- Portrait guidance reacts to detected face scale, vertical placement, and camera pitch. Food guidance compares top-down/45-degree options from pitch. Landscape and architecture guidance warn about camera direction and perspective trade-offs.
+- The UI exposes up to four concise advice lines under an explicit “AI photographer” label.
+- These are offline heuristics, not a trained aesthetic model. Pitch is a sensor-derived orientation estimate; exact camera-to-subject distance, gaze direction, building vertical convergence, and food-specific object geometry are not yet measured. Validate sign/orientation behavior on front/rear cameras and device rotations before treating angle labels as calibrated.
