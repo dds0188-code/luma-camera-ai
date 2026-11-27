@@ -447,15 +447,18 @@ private fun CameraPreview(
                 val capabilities = camera2Info.getCameraCharacteristic(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
                     ?: intArrayOf()
                 val manualSensorSupported = capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
-                val manualExposureAvailable = manualSensorSupported && isoRange != null && shutterRange != null
+                val camera2Control = runCatching { Camera2CameraControl.from(boundCamera.cameraControl) }.getOrNull()
+                val manualExposureAvailable = manualSensorSupported && isoRange != null && shutterRange != null && camera2Control != null
                 onManualExposureSupport(manualExposureAvailable, isoRange?.lower ?: 100, isoRange?.upper ?: 800)
-                val camera2Control = Camera2CameraControl.from(boundCamera.cameraControl)
                 onManualExposureActionAvailable { enabled, requestedIso, requestedShutterNs ->
-                    if (!manualExposureAvailable) {
+                    if (!manualExposureAvailable || camera2Control == null) {
                         onCaptureStatus("이 카메라는 수동 ISO·셔터를 지원하지 않습니다.")
                     } else if (!enabled) {
-                        camera2Control.clearCaptureRequestOptions().addListener({
-                            onCaptureStatus("자동 노출 모드로 전환했습니다.")
+                        val future = camera2Control.clearCaptureRequestOptions()
+                        future.addListener({
+                            runCatching { future.get() }
+                                .onSuccess { onCaptureStatus("자동 노출 모드로 전환했습니다.") }
+                                .onFailure { error -> onCaptureStatus("자동 노출 전환 실패: ${error.localizedMessage ?: "카메라 오류"}") }
                         }, mainExecutor)
                     } else {
                         val safeIso = ManualExposureOptions.normalizeIso(requestedIso, isoRange!!.lower, isoRange.upper)
@@ -465,8 +468,11 @@ private fun CameraPreview(
                             .setCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY, safeIso)
                             .setCaptureRequestOption(CaptureRequest.SENSOR_EXPOSURE_TIME, safeShutterNs)
                             .build()
-                        camera2Control.addCaptureRequestOptions(options).addListener({
-                            onCaptureStatus("수동 노출 적용 · ISO $safeIso · ${"%.1f".format(safeShutterNs / 1_000_000.0)} ms")
+                        val future = camera2Control.addCaptureRequestOptions(options)
+                        future.addListener({
+                            runCatching { future.get() }
+                                .onSuccess { onCaptureStatus("수동 노출 적용 · ISO $safeIso · ${"%.1f".format(safeShutterNs / 1_000_000.0)} ms") }
+                                .onFailure { error -> onCaptureStatus("수동 노출 적용 실패: ${error.localizedMessage ?: "카메라 오류"}") }
                         }, mainExecutor)
                     }
                 }
