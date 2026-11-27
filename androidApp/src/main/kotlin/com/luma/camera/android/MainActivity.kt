@@ -118,6 +118,7 @@ private fun LumaCameraApplication() {
     var captureTimerSeconds by remember { mutableStateOf(0) }
     var captureBurstCount by remember { mutableStateOf(1) }
     var gridMode by remember { mutableStateOf("삼분할") }
+    var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
     val qualityExecutor = remember { Executors.newSingleThreadExecutor() }
     DisposableEffect(qualityExecutor) { onDispose { qualityExecutor.shutdownNow() } }
 
@@ -186,6 +187,8 @@ private fun LumaCameraApplication() {
     }
 
     App(
+        isFrontCamera = lensFacing == CameraSelector.LENS_FACING_FRONT,
+        onToggleCamera = { lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK },
         onCaptureClick = { captureAction?.invoke(captureTimerSeconds, captureBurstCount) },
         captureTimerSeconds = captureTimerSeconds,
         onCaptureTimerChange = { captureTimerSeconds = it },
@@ -231,6 +234,7 @@ private fun LumaCameraApplication() {
                         exposureIndex = current; minExposureIndex = minimum; maxExposureIndex = maximum
                     },
                     qualityExecutor = qualityExecutor,
+                    lensFacing = lensFacing,
                     onPhotoQualitySummary = { photoQualitySummary = it },
                     onPhotoQualityLines = { photoQualityLines = it },
                     onCameraCapabilitySummary = { cameraCapabilitySummary = it },
@@ -272,6 +276,7 @@ private fun CameraPreview(
     onZoomInfo: (Float, Float) -> Unit,
     onExposureInfo: (Int, Int, Int) -> Unit,
     qualityExecutor: java.util.concurrent.ExecutorService,
+    lensFacing: Int,
     onPhotoQualitySummary: (String) -> Unit,
     onPhotoQualityLines: (List<String>) -> Unit,
     onCameraCapabilitySummary: (String) -> Unit,
@@ -299,7 +304,7 @@ private fun CameraPreview(
     }
     val imageLabeler = remember { ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS) }
 
-    DisposableEffect(lifecycleOwner, cameraProviderFuture, previewView, detector, imageLabeler) {
+    DisposableEffect(lifecycleOwner, cameraProviderFuture, previewView, detector, imageLabeler, lensFacing) {
         var imageCapture: ImageCapture? = null
         var isCapturing = false
         var isDisposed = false
@@ -346,7 +351,8 @@ private fun CameraPreview(
                                             val bounds = face.boundingBox
                                             val width = mediaImage.width.toDouble().coerceAtLeast(1.0)
                                             val height = mediaImage.height.toDouble().coerceAtLeast(1.0)
-                                            val centerX = (bounds.centerX() / width).coerceIn(0.0, 1.0)
+                                            val rawCenterX = (bounds.centerX() / width).coerceIn(0.0, 1.0)
+                                            val centerX = if (lensFacing == CameraSelector.LENS_FACING_FRONT) 1.0 - rawCenterX else rawCenterX
                                             val centerY = (bounds.centerY() / height).coerceIn(0.0, 1.0)
                                             val area = (bounds.width().toDouble() * bounds.height().toDouble() / (width * height)).coerceIn(0.0, 1.0)
                                             onFaceDetected(centerX, centerY, area)
@@ -374,8 +380,12 @@ private fun CameraPreview(
                 }
 
                 provider.unbindAll()
+                val cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
+                if (!provider.hasCamera(cameraSelector)) {
+                    throw IllegalStateException(if (lensFacing == CameraSelector.LENS_FACING_FRONT) "전면 카메라를 찾을 수 없습니다." else "후면 카메라를 찾을 수 없습니다.")
+                }
                 val boundCamera = provider.bindToLifecycle(
-                    lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture, analysis
+                    lifecycleOwner, cameraSelector, preview, capture, analysis
                 )
                 imageCapture = capture
 
@@ -411,7 +421,8 @@ private fun CameraPreview(
                     "수동 ISO·셔터 미지원 또는 제한"
                 }
                 onCameraCapabilitySummary(
-                    "후면 카메라 · " + (if (boundCamera.cameraInfo.hasFlashUnit()) "플래시 있음" else "플래시 없음") + "\n" +
+                    (if (lensFacing == CameraSelector.LENS_FACING_FRONT) "전면 카메라 · " else "후면 카메라 · ") +
+                        (if (boundCamera.cameraInfo.hasFlashUnit()) "플래시 있음" else "플래시 없음") + "\n" +
                         manualText + " · " + isoText + " · " + shutterText + "\n" +
                         "화이트밸런스: " + awbNames.joinToString(" · ").ifBlank { "지원 모드 확인 불가" }
                 )
@@ -453,7 +464,7 @@ private fun CameraPreview(
                         else -> true
                     }
                 }
-                onCaptureStatus("후면 카메라 연결됨 · 얼굴 분석 및 터치 초점 준비")
+                onCaptureStatus((if (lensFacing == CameraSelector.LENS_FACING_FRONT) "전면" else "후면") + " 카메라 연결됨 · 얼굴/장면 분석 및 터치 초점 준비")
                 fun captureNow(remainingShots: Int, totalShots: Int) {
                     val activeCapture = imageCapture
                     if (activeCapture == null) {
