@@ -12,6 +12,8 @@ import android.hardware.SensorManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
 import android.view.MotionEvent
@@ -82,7 +84,7 @@ private fun LumaCameraApplication() {
     var hasCameraPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
-    var captureAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var captureAction by remember { mutableStateOf<((Int) -> Unit)?>(null) }
     var zoomAction by remember { mutableStateOf<((Float) -> Unit)?>(null) }
     var exposureAction by remember { mutableStateOf<((Int) -> Unit)?>(null) }
     var torchAction by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
@@ -102,6 +104,8 @@ private fun LumaCameraApplication() {
     var photoQualityLines by remember { mutableStateOf(emptyList<String>()) }
     var cameraCapabilitySummary by remember { mutableStateOf("카메라 지원 기능 확인 중…") }
     var torchEnabled by remember { mutableStateOf(false) }
+    var captureTimerSeconds by remember { mutableStateOf(0) }
+    var gridMode by remember { mutableStateOf("삼분할") }
     val qualityExecutor = remember { Executors.newSingleThreadExecutor() }
     DisposableEffect(qualityExecutor) { onDispose { qualityExecutor.shutdownNow() } }
 
@@ -170,7 +174,11 @@ private fun LumaCameraApplication() {
     }
 
     App(
-        onCaptureClick = { captureAction?.invoke() },
+        onCaptureClick = { captureAction?.invoke(captureTimerSeconds) },
+        captureTimerSeconds = captureTimerSeconds,
+        onCaptureTimerChange = { captureTimerSeconds = it },
+        gridMode = gridMode,
+        onGridModeChange = { gridMode = it },
         captureStatus = captureStatus,
         zoomRatio = zoomRatio,
         maxZoomRatio = maxZoomRatio,
@@ -226,7 +234,7 @@ private fun LumaCameraApplication() {
 
 @Composable
 private fun CameraPreview(
-    onCaptureActionAvailable: ((() -> Unit)?) -> Unit,
+    onCaptureActionAvailable: (((Int) -> Unit)?) -> Unit,
     onCaptureStatus: (String) -> Unit,
     onZoomActionAvailable: (((Float) -> Unit)?) -> Unit,
     onExposureActionAvailable: (((Int) -> Unit)?) -> Unit,
@@ -264,6 +272,8 @@ private fun CameraPreview(
         var imageCapture: ImageCapture? = null
         var isCapturing = false
         var isDisposed = false
+        val timerHandler = Handler(Looper.getMainLooper())
+        var countdownRunnable: Runnable? = null
         val analysisBusy = AtomicBoolean(false)
         val listener = Runnable {
             if (isDisposed) return@Runnable
@@ -389,42 +399,67 @@ private fun CameraPreview(
                     }
                 }
                 onCaptureStatus("후면 카메라 연결됨 · 얼굴 분석 및 터치 초점 준비")
-                onCaptureActionAvailable {
+                fun captureNow() {
                     val activeCapture = imageCapture
                     if (activeCapture == null) {
+                        isCapturing = false
                         onCaptureStatus("카메라가 아직 준비되지 않았습니다.")
-                    } else if (isCapturing) {
-                        onCaptureStatus("사진 저장 중입니다…")
+                        return
+                    }
+                    activeCapture.targetRotation = previewView.display?.rotation ?: Surface.ROTATION_0
+                    onCaptureStatus("사진 촬영 중…")
+                    saveCapture(activeCapture, context, mainExecutor,
+                        onSaved = { uri ->
+                            isCapturing = false
+                            onCaptureStatus("저장 완료 · 사진 품질 분석 중…")
+                            onPhotoQualitySummary("저장된 사진을 기기 안에서 분석하고 있습니다.")
+                            onPhotoQualityLines(emptyList())
+                            analyzeSavedPhoto(uri, context, qualityExecutor, mainExecutor,
+                                onResult = { result ->
+                                    onPhotoQualitySummary("종합 ${result.score}점 · 노출 ${result.exposureScore}점 · 명암 ${result.contrastScore}점 · 디테일 ${result.detailScore}점")
+                                    onPhotoQualityLines(result.suggestions)
+                                    onCaptureStatus("저장 및 사진 품질 분석 완료 · 갤러리에서도 확인할 수 있습니다.")
+                                },
+                                onFailure = { message ->
+                                    onPhotoQualitySummary("사진은 저장됐지만 분석하지 못했습니다.")
+                                    onPhotoQualityLines(listOf(message))
+                                    onCaptureStatus("사진 저장 완료 · 품질 분석은 실패했습니다.")
+                                }
+                            )
+                            Log.i(TAG, "Photo saved: $uri")
+                        },
+                        onFailure = { message ->
+                            isCapturing = false
+                            onCaptureStatus("촬영 실패: $message")
+                            Log.e(TAG, "Capture failed: $message")
+                        }
+                    )
+                }
+                onCaptureActionAvailable { delaySeconds ->
+                    if (isCapturing) {
+                        onCaptureStatus("카운트다운 또는 촬영이 이미 진행 중입니다.")
                     } else {
                         isCapturing = true
-                        activeCapture.targetRotation = previewView.display?.rotation ?: Surface.ROTATION_0
-                        onCaptureStatus("사진 촬영 중…")
-                        saveCapture(activeCapture, context, mainExecutor,
-                            onSaved = { uri ->
-                                isCapturing = false
-                                onCaptureStatus("저장 완료 · 사진 품질 분석 중…")
-                                onPhotoQualitySummary("저장된 사진을 기기 안에서 분석하고 있습니다.")
-                                onPhotoQualityLines(emptyList())
-                                analyzeSavedPhoto(uri, context, qualityExecutor, mainExecutor,
-                                    onResult = { result ->
-                                        onPhotoQualitySummary("종합 ${result.score}점 · 노출 ${result.exposureScore}점 · 명암 ${result.contrastScore}점 · 디테일 ${result.detailScore}점")
-                                        onPhotoQualityLines(result.suggestions)
-                                        onCaptureStatus("저장 및 사진 품질 분석 완료 · 갤러리에서도 확인할 수 있습니다.")
-                                    },
-                                    onFailure = { message ->
-                                        onPhotoQualitySummary("사진은 저장됐지만 분석하지 못했습니다.")
-                                        onPhotoQualityLines(listOf(message))
-                                        onCaptureStatus("사진 저장 완료 · 품질 분석은 실패했습니다.")
-                                    }
-                                )
-                                Log.i(TAG, "Photo saved: $uri")
-                            },
-                            onFailure = { message ->
-                                isCapturing = false
-                                onCaptureStatus("촬영 실패: $message")
-                                Log.e(TAG, "Capture failed: $message")
+                        val safeDelay = delaySeconds.coerceIn(0, 10)
+                        if (safeDelay == 0) {
+                            captureNow()
+                        } else {
+                            var remaining = safeDelay
+                            lateinit var tick: Runnable
+                            tick = Runnable {
+                                if (isDisposed) return@Runnable
+                                if (remaining <= 0) {
+                                    countdownRunnable = null
+                                    captureNow()
+                                } else {
+                                    onCaptureStatus("${remaining}초 후 자동 촬영")
+                                    remaining -= 1
+                                    timerHandler.postDelayed(tick, 1000L)
+                                }
                             }
-                        )
+                            countdownRunnable = tick
+                            timerHandler.post(tick)
+                        }
                     }
                 }
             } catch (error: Exception) {
@@ -439,6 +474,9 @@ private fun CameraPreview(
         cameraProviderFuture.addListener(listener, mainExecutor)
         onDispose {
             isDisposed = true
+            countdownRunnable?.let(timerHandler::removeCallbacks)
+            countdownRunnable = null
+            isCapturing = false
             onCaptureActionAvailable(null)
             onZoomActionAvailable(null)
             onExposureActionAvailable(null)
