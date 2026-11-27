@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.MediaStore
 import android.util.Log
 import android.view.MotionEvent
@@ -53,6 +54,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
+import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.vision.label.ImageLabel
+import com.google.mlkit.vision.label.ImageLabeling
+import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
 import com.luma.camera.App
 import com.luma.camera.analysis.CaptureTimerOptions
 import com.luma.camera.analysis.CaptureBurstOptions
@@ -62,6 +67,8 @@ import com.luma.camera.analysis.PhotoQualityAnalyzer
 import com.luma.camera.analysis.PhotoQualityInput
 import com.luma.camera.analysis.SceneAdviceInput
 import com.luma.camera.analysis.SceneAdvisor
+import com.luma.camera.analysis.SceneClassifier
+import com.luma.camera.analysis.SceneLabelInput
 import com.luma.camera.analysis.ShootingIntent
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -105,6 +112,8 @@ private fun LumaCameraApplication() {
     var photoQualitySummary by remember { mutableStateOf("") }
     var photoQualityLines by remember { mutableStateOf(emptyList<String>()) }
     var cameraCapabilitySummary by remember { mutableStateOf("카메라 지원 기능 확인 중…") }
+    var sceneRecognitionSummary by remember { mutableStateOf("온디바이스 장면 분석 준비 중…") }
+    var recognizedShootingIntent by remember { mutableStateOf<ShootingIntent?>(null) }
     var torchEnabled by remember { mutableStateOf(false) }
     var captureTimerSeconds by remember { mutableStateOf(0) }
     var captureBurstCount by remember { mutableStateOf(1) }
@@ -203,6 +212,9 @@ private fun LumaCameraApplication() {
         photoQualitySummary = photoQualitySummary,
         photoQualityLines = photoQualityLines,
         cameraCapabilitySummary = cameraCapabilitySummary,
+        sceneRecognitionSummary = sceneRecognitionSummary,
+        recognizedShootingIntent = recognizedShootingIntent,
+        onApplyRecognizedScene = { shootingIntent = it },
         torchEnabled = torchEnabled,
         onTorchToggle = { torchAction?.invoke(it) },
         cameraPreview = {
@@ -222,6 +234,18 @@ private fun LumaCameraApplication() {
                     onPhotoQualitySummary = { photoQualitySummary = it },
                     onPhotoQualityLines = { photoQualityLines = it },
                     onCameraCapabilitySummary = { cameraCapabilitySummary = it },
+                    onSceneLabels = { labels ->
+                        val classification = SceneClassifier.classify(labels)
+                        if (classification == null) {
+                            sceneRecognitionSummary = if (labels.isEmpty()) "장면을 분석하고 있습니다." else "장면을 확신 있게 분류하지 못했어요. 피사체를 더 크게 비춰보세요."
+                            recognizedShootingIntent = null
+                        } else {
+                            val percent = (classification.confidence * 100).toInt()
+                            val matched = classification.matchedLabels.take(2).joinToString(" · ")
+                            sceneRecognitionSummary = "${classification.intent.label} 장면 후보 · 신뢰도 ${percent}% · $matched"
+                            recognizedShootingIntent = classification.intent
+                        }
+                    },
                     onFaceDetected = { x, y, area ->
                         faceCenterX = x; faceCenterY = y; faceArea = area
                         faceGuidance = "얼굴 피사체 감지 · 구도 분석 중"
@@ -251,6 +275,7 @@ private fun CameraPreview(
     onPhotoQualitySummary: (String) -> Unit,
     onPhotoQualityLines: (List<String>) -> Unit,
     onCameraCapabilitySummary: (String) -> Unit,
+    onSceneLabels: (List<SceneLabelInput>) -> Unit,
     onFaceDetected: (Double, Double, Double) -> Unit,
     onFaceLost: () -> Unit
 ) {
@@ -272,14 +297,17 @@ private fun CameraPreview(
                 .build()
         )
     }
+    val imageLabeler = remember { ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS) }
 
-    DisposableEffect(lifecycleOwner, cameraProviderFuture, previewView, detector) {
+    DisposableEffect(lifecycleOwner, cameraProviderFuture, previewView, detector, imageLabeler) {
         var imageCapture: ImageCapture? = null
         var isCapturing = false
         var isDisposed = false
         val timerHandler = Handler(Looper.getMainLooper())
         var countdownRunnable: Runnable? = null
         val analysisBusy = AtomicBoolean(false)
+        val analysisExecutor = Executors.newSingleThreadExecutor()
+        var lastSceneLabelTimestamp = 0L
         val listener = Runnable {
             if (isDisposed) return@Runnable
             try {
@@ -292,34 +320,56 @@ private fun CameraPreview(
                 val analysis = ImageAnalysis.Builder()
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
-                analysis.setAnalyzer(ContextCompat.getMainExecutor(context)) { proxy ->
+                analysis.setAnalyzer(analysisExecutor) { proxy ->
                     val mediaImage = proxy.image
                     if (mediaImage == null || !analysisBusy.compareAndSet(false, true)) {
                         proxy.close()
                     } else {
-                        val input = InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees)
-                        detector.process(input)
-                            .addOnSuccessListener(mainExecutor) { faces ->
-                                val face = faces.maxByOrNull { it.boundingBox.width().toLong() * it.boundingBox.height().toLong() }
-                                if (face == null) {
-                                    onFaceLost()
-                                } else {
-                                    val bounds = face.boundingBox
-                                    val width = mediaImage.width.toDouble().coerceAtLeast(1.0)
-                                    val height = mediaImage.height.toDouble().coerceAtLeast(1.0)
-                                    val centerX = (bounds.centerX() / width).coerceIn(0.0, 1.0)
-                                    val centerY = (bounds.centerY() / height).coerceIn(0.0, 1.0)
-                                    val area = (bounds.width().toDouble() * bounds.height().toDouble() / (width * height)).coerceIn(0.0, 1.0)
-                                    onFaceDetected(centerX, centerY, area)
+                        try {
+                            val input = InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees)
+                            val faceTask = detector.process(input)
+                            val now = SystemClock.elapsedRealtime()
+                            val shouldLabelScene = now - lastSceneLabelTimestamp >= 1_000L
+                            val labelTask = if (shouldLabelScene) {
+                                lastSceneLabelTimestamp = now
+                                imageLabeler.process(input)
+                            } else {
+                                Tasks.forResult(emptyList<ImageLabel>())
+                            }
+                            Tasks.whenAllComplete(faceTask, labelTask).addOnCompleteListener(mainExecutor) {
+                                if (!isDisposed) {
+                                    if (faceTask.isSuccessful) {
+                                        val face = faceTask.result.maxByOrNull { it.boundingBox.width().toLong() * it.boundingBox.height().toLong() }
+                                        if (face == null) {
+                                            onFaceLost()
+                                        } else {
+                                            val bounds = face.boundingBox
+                                            val width = mediaImage.width.toDouble().coerceAtLeast(1.0)
+                                            val height = mediaImage.height.toDouble().coerceAtLeast(1.0)
+                                            val centerX = (bounds.centerX() / width).coerceIn(0.0, 1.0)
+                                            val centerY = (bounds.centerY() / height).coerceIn(0.0, 1.0)
+                                            val area = (bounds.width().toDouble() * bounds.height().toDouble() / (width * height)).coerceIn(0.0, 1.0)
+                                            onFaceDetected(centerX, centerY, area)
+                                        }
+                                    } else {
+                                        Log.w(TAG, "On-device face detection failed", faceTask.exception)
+                                    }
+                                    if (shouldLabelScene) {
+                                        if (labelTask.isSuccessful) {
+                                            onSceneLabels(labelTask.result.map { SceneLabelInput(it.text, it.confidence.toDouble()) })
+                                        } else {
+                                            Log.w(TAG, "On-device scene labeling failed", labelTask.exception)
+                                        }
+                                    }
                                 }
-                            }
-                            .addOnFailureListener(mainExecutor) { error ->
-                                Log.w(TAG, "On-device face detection failed", error)
-                            }
-                            .addOnCompleteListener {
                                 analysisBusy.set(false)
                                 proxy.close()
                             }
+                        } catch (error: Exception) {
+                            analysisBusy.set(false)
+                            proxy.close()
+                            Log.w(TAG, "Camera frame analysis failed", error)
+                        }
                     }
                 }
 
@@ -496,6 +546,8 @@ private fun CameraPreview(
             previewView.setOnTouchListener(null)
             imageCapture = null
             detector.close()
+            imageLabeler.close()
+            analysisExecutor.shutdown()
             if (cameraProviderFuture.isDone) runCatching { cameraProviderFuture.get().unbindAll() }
         }
     }
