@@ -77,6 +77,30 @@ class SceneAdvisorTest {
     }
 
     @Test
+    fun portraitAdviceRespondsToCameraPitchAndFaceScale() {
+        val advice = SceneAdvisor.advise(
+            SceneAdviceInput(
+                intent = ShootingIntent.PORTRAIT,
+                subjectAreaRatio = 0.02,
+                cameraPitchDegrees = 12.0,
+                currentZoomRatio = 1f,
+                maxZoomRatio = 4f
+            )
+        )
+        assertTrue(advice.recommendations.any { it.contains("아래로 기울어져") })
+        assertTrue(advice.recommendations.any { it.contains("얼굴이 작게") })
+        assertEquals(1.79f, advice.suggestedZoomRatio, 0.02f)
+    }
+
+    @Test
+    fun foodAdviceAdaptsAngleHintToPitch() {
+        val advice = SceneAdvisor.advise(
+            SceneAdviceInput(intent = ShootingIntent.FOOD, cameraPitchDegrees = 24.0)
+        )
+        assertTrue(advice.recommendations.any { it.contains("탑뷰") })
+    }
+
+    @Test
     fun architectureAdviceMentionsVerticalLines() {
         val advice = SceneAdvisor.advise(
             SceneAdviceInput(intent = ShootingIntent.ARCHITECTURE, horizonTiltDegrees = 2.0)
