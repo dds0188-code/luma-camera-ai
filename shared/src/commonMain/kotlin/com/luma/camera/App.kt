@@ -242,7 +242,16 @@ fun App(
                                 disabledContentColor = Muted.copy(alpha = 0.45f)
                             ),
                             shape = CircleShape
-                        ) { Text(if (lowLightBoostEnabled) "저조도 ON" else "저조도", style = MaterialTheme.typography.labelSmall) }
+                        ) {
+                            Text(
+                                when {
+                                    lowLightBoostEnabled -> "저조도 ON"
+                                    manualExposureEnabled -> "저조도 · 자동노출 필요"
+                                    else -> "저조도"
+                                },
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
                     }
                     listOf("삼분할", "중앙", "끄기").forEach { mode ->
                         val selected = gridMode == mode
