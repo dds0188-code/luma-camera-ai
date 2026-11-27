@@ -66,6 +66,7 @@ import com.luma.camera.App
 import com.luma.camera.analysis.CaptureTimerOptions
 import com.luma.camera.analysis.CaptureBurstOptions
 import com.luma.camera.analysis.ManualExposureOptions
+import com.luma.camera.analysis.ManualFocusOptions
 import com.luma.camera.analysis.CompositionAnalyzer
 import com.luma.camera.analysis.CompositionInput
 import com.luma.camera.analysis.PhotoQualityAnalyzer
@@ -107,6 +108,11 @@ private fun LumaCameraApplication() {
     var manualIsoRange by remember { mutableStateOf(100..800) }
     var manualIso by remember { mutableStateOf(100) }
     var manualShutterNs by remember { mutableStateOf(16_666_667L) }
+    var manualFocusAction by remember { mutableStateOf<((Boolean, Float) -> Unit)?>(null) }
+    var manualFocusSupported by remember { mutableStateOf(false) }
+    var manualFocusEnabled by remember { mutableStateOf(false) }
+    var manualFocusDistance by remember { mutableStateOf(0f) }
+    var minimumFocusDistance by remember { mutableStateOf(0f) }
     var torchAction by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
     var captureStatus by remember { mutableStateOf("카메라 초기화 중…") }
     var zoomRatio by remember { mutableStateOf(1f) }
@@ -144,6 +150,9 @@ private fun LumaCameraApplication() {
         manualExposureEnabled = false
         manualExposureSupported = false
         manualExposureAction = null
+        manualFocusEnabled = false
+        manualFocusSupported = false
+        manualFocusAction = null
     }
 
     val sensorManager = remember(context) { context.getSystemService(SensorManager::class.java) }
@@ -233,6 +242,16 @@ private fun LumaCameraApplication() {
             manualExposureAction?.invoke(enabled, manualIso, manualShutterNs)
         },
         onApplyManualExposure = { manualExposureAction?.invoke(true, manualIso, manualShutterNs) },
+        manualFocusSupported = manualFocusSupported,
+        manualFocusEnabled = manualFocusEnabled,
+        manualFocusDistance = manualFocusDistance,
+        minimumFocusDistance = minimumFocusDistance,
+        onManualFocusToggle = { enabled ->
+            manualFocusEnabled = enabled
+            manualFocusAction?.invoke(enabled, manualFocusDistance)
+        },
+        onManualFocusDistanceChange = { manualFocusDistance = it },
+        onApplyManualFocus = { manualFocusAction?.invoke(true, manualFocusDistance) },
         horizonTiltDegrees = horizonTilt,
         compositionGuidance = guidance,
         shootingIntent = shootingIntent,
@@ -257,6 +276,13 @@ private fun LumaCameraApplication() {
                     onZoomActionAvailable = { zoomAction = it },
                     onExposureActionAvailable = { exposureAction = it },
                     onManualExposureActionAvailable = { manualExposureAction = it },
+                    onManualFocusActionAvailable = { manualFocusAction = it },
+                    onManualFocusSupport = { supported, maximum ->
+                        manualFocusSupported = supported
+                        minimumFocusDistance = maximum
+                        manualFocusDistance = manualFocusDistance.coerceIn(0f, maximum)
+                        if (!supported) manualFocusEnabled = false
+                    },
                     onManualExposureSupport = { supported, minimum, maximum ->
                         manualExposureSupported = supported
                         if (supported) {
@@ -312,6 +338,8 @@ private fun CameraPreview(
     onZoomActionAvailable: (((Float) -> Unit)?) -> Unit,
     onExposureActionAvailable: (((Int) -> Unit)?) -> Unit,
     onManualExposureActionAvailable: (((Boolean, Int, Long) -> Unit)?) -> Unit,
+    onManualFocusActionAvailable: (((Boolean, Float) -> Unit)?) -> Unit,
+    onManualFocusSupport: (Boolean, Float) -> Unit,
     onManualExposureSupport: (Boolean, Int, Int) -> Unit,
     onTorchActionAvailable: (((Boolean) -> Unit)?) -> Unit,
     onTorchInfo: (Boolean) -> Unit,
@@ -447,12 +475,39 @@ private fun CameraPreview(
                 val capabilities = camera2Info.getCameraCharacteristic(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
                     ?: intArrayOf()
                 val manualSensorSupported = capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
+                val minimumFocus = camera2Info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
+                val manualFocusAvailable = manualSensorSupported && minimumFocus > 0f
+                onManualFocusSupport(manualFocusAvailable, minimumFocus)
                 val camera2Control = runCatching { Camera2CameraControl.from(boundCamera.cameraControl) }.getOrNull()
                 val manualExposureAvailable = manualSensorSupported &&
                     isoRange != null && isoRange.lower > 0 &&
                     shutterRange != null && shutterRange.lower > 0 &&
                     camera2Control != null
                 onManualExposureSupport(manualExposureAvailable, isoRange?.lower ?: 100, isoRange?.upper ?: 800)
+                onManualFocusActionAvailable { enabled, requestedDistance ->
+                    if (!manualFocusAvailable || camera2Control == null) {
+                        onCaptureStatus("이 렌즈는 수동 초점을 지원하지 않습니다.")
+                    } else {
+                        val options = CaptureRequestOptions.Builder()
+                            .setCaptureRequestOption(
+                                CaptureRequest.CONTROL_AF_MODE,
+                                if (enabled) CaptureRequest.CONTROL_AF_MODE_OFF else CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
+                            )
+                            .apply {
+                                if (enabled) setCaptureRequestOption(
+                                    CaptureRequest.LENS_FOCUS_DISTANCE,
+                                    ManualFocusOptions.normalizeDiopters(requestedDistance, minimumFocus)
+                                )
+                            }
+                            .build()
+                        val future = camera2Control.addCaptureRequestOptions(options)
+                        future.addListener({
+                            runCatching { future.get() }
+                                .onSuccess { onCaptureStatus(if (enabled) "수동 초점 적용 · ${"%.2f".format(requestedDistance)} D" else "자동 초점으로 전환했습니다.") }
+                                .onFailure { error -> onCaptureStatus("초점 설정 실패: ${error.localizedMessage ?: "카메라 오류"}") }
+                        }, mainExecutor)
+                    }
+                }
                 onManualExposureActionAvailable { enabled, requestedIso, requestedShutterNs ->
                     if (!manualExposureAvailable || camera2Control == null) {
                         onCaptureStatus("이 카메라는 수동 ISO·셔터를 지원하지 않습니다.")
@@ -621,6 +676,8 @@ private fun CameraPreview(
                 onZoomActionAvailable(null)
                 onExposureActionAvailable(null)
                 onManualExposureActionAvailable(null)
+                onManualFocusActionAvailable(null)
+                onManualFocusSupport(false, 0f)
                 onManualExposureSupport(false, 100, 800)
                 onTorchActionAvailable(null)
                 onCaptureStatus("카메라 연결 실패: ${error.localizedMessage ?: "알 수 없는 오류"}")
@@ -637,6 +694,8 @@ private fun CameraPreview(
             onZoomActionAvailable(null)
             onExposureActionAvailable(null)
             onManualExposureActionAvailable(null)
+            onManualFocusActionAvailable(null)
+            onManualFocusSupport(false, 0f)
             onManualExposureSupport(false, 100, 800)
             onTorchActionAvailable(null)
             previewView.setOnTouchListener(null)
