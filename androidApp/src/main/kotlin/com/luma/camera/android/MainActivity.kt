@@ -65,6 +65,7 @@ import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
 import com.luma.camera.App
 import com.luma.camera.analysis.CaptureTimerOptions
 import com.luma.camera.analysis.CaptureBurstOptions
+import com.luma.camera.analysis.ManualExposureOptions
 import com.luma.camera.analysis.CompositionAnalyzer
 import com.luma.camera.analysis.CompositionInput
 import com.luma.camera.analysis.PhotoQualityAnalyzer
@@ -138,6 +139,11 @@ private fun LumaCameraApplication() {
     }
     LaunchedEffect(Unit) {
         if (!hasCameraPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
+    }
+    LaunchedEffect(lensFacing) {
+        manualExposureEnabled = false
+        manualExposureSupported = false
+        manualExposureAction = null
     }
 
     val sensorManager = remember(context) { context.getSystemService(SensorManager::class.java) }
@@ -298,6 +304,7 @@ private fun LumaCameraApplication() {
     )
 }
 
+@OptIn(ExperimentalCamera2Interop::class)
 @Composable
 private fun CameraPreview(
     onCaptureActionAvailable: (((Int, Int) -> Unit)?) -> Unit,
@@ -451,8 +458,8 @@ private fun CameraPreview(
                             onCaptureStatus("자동 노출 모드로 전환했습니다.")
                         }, mainExecutor)
                     } else {
-                        val safeIso = requestedIso.coerceIn(isoRange!!.lower, isoRange.upper)
-                        val safeShutterNs = requestedShutterNs.coerceIn(shutterRange!!.lower, shutterRange.upper)
+                        val safeIso = ManualExposureOptions.normalizeIso(requestedIso, isoRange!!.lower, isoRange.upper)
+                        val safeShutterNs = ManualExposureOptions.normalizeExposureTime(requestedShutterNs, shutterRange!!.lower, shutterRange.upper)
                         val options = CaptureRequestOptions.Builder()
                             .setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
                             .setCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY, safeIso)
