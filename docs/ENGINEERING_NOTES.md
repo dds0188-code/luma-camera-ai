@@ -92,3 +92,13 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - Added selectable preview overlays: rule-of-thirds grid, center crosshair, and no overlay. The control strip is horizontally scrollable for narrow phone screens.
 - The timer delays the existing CameraX capture and MediaStore save path; it does not create a web view, remote image dependency, or network requirement.
 - Physical-device validation is still required for shutter timing, lifecycle interruption, and device-specific preview layout.
+
+
+## Burst capture
+
+- Added common single-shot / three-shot burst presets with unit tests for supported counts and normalization.
+- Android burst capture executes CameraX ImageCapture sequentially rather than firing concurrent requests. Each successful shot is inserted as its own JPEG in MediaStore.
+- The last saved image is passed to the existing local quality analyzer; earlier images are saved without redundant thumbnail analysis during the same burst.
+- Capture filenames include milliseconds to reduce same-second filename collisions during rapid shooting.
+- A burst remains marked in progress until all requested shots have either saved or an error occurs, preventing overlapping sequences.
+- Hardware validation is still required to measure real inter-shot cadence and verify behavior on different CameraX camera implementations.
