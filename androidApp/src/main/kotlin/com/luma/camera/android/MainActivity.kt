@@ -282,6 +282,7 @@ private fun LumaCameraApplication() {
                     onExposureActionAvailable = { exposureAction = it },
                     onManualExposureActionAvailable = { manualExposureAction = it },
                     onManualFocusActionAvailable = { manualFocusAction = it },
+                    onRestoreManualFocus = { if (manualFocusEnabled) manualFocusAction?.invoke(true, manualFocusDistance) },
                     onManualFocusSupport = { supported, maximum ->
                         manualFocusSupported = supported
                         minimumFocusDistance = maximum
@@ -348,6 +349,7 @@ private fun CameraPreview(
     onExposureActionAvailable: (((Int) -> Unit)?) -> Unit,
     onManualExposureActionAvailable: (((Boolean, Int, Long) -> Unit)?) -> Unit,
     onManualFocusActionAvailable: (((Boolean, Float) -> Unit)?) -> Unit,
+    onRestoreManualFocus: () -> Unit,
     onManualFocusSupport: (Boolean, Float) -> Unit,
     onExposureMeter: (List<Float>, String) -> Unit,
     onManualExposureSupport: (Boolean, Int, Int) -> Unit,
@@ -549,8 +551,8 @@ private fun CameraPreview(
                         future.addListener({
                             runCatching { future.get() }
                                 .onSuccess {
-                                    if (manualFocusEnabled) manualFocusAction?.invoke(true, manualFocusDistance)
-                                    else onCaptureStatus("자동 노출 모드로 전환했습니다.")
+                                    onRestoreManualFocus()
+                                    onCaptureStatus("자동 노출 모드로 전환했습니다.")
                                 }
                                 .onFailure { error -> onCaptureStatus("자동 노출 전환 실패: ${error.localizedMessage ?: "카메라 오류"}") }
                         }, mainExecutor)
