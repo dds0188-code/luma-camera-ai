@@ -313,10 +313,6 @@ private fun LumaCameraApplication() {
             if (enabled && manualExposureEnabled) {
                 captureStatus = "저조도 부스트를 사용하려면 먼저 수동 노출을 자동으로 전환하세요."
             } else {
-                if (enabled && torchEnabled) {
-                    torchAction?.invoke(false)
-                    torchEnabled = false
-                }
                 lowLightBoostAction?.invoke(enabled)
             }
         },
@@ -335,10 +331,7 @@ private fun LumaCameraApplication() {
         recognizedShootingIntent = recognizedShootingIntent,
         onApplyRecognizedScene = { shootingIntent = it },
         torchEnabled = torchEnabled,
-        onTorchToggle = { enabled ->
-            if (enabled && lowLightBoostEnabled) lowLightBoostEnabled = false
-            torchAction?.invoke(enabled)
-        },
+        onTorchToggle = { enabled -> torchAction?.invoke(enabled) },
         cameraPreview = {
             if (hasCameraPermission) {
                 CameraPreview(
@@ -784,30 +777,56 @@ private fun CameraPreview(
                         onCaptureStatus("이 카메라는 저조도 부스트를 지원하지 않습니다.")
                     } else {
                         val requestId = ++lowLightRequestId
-                        val future = boundCamera.cameraControl.enableLowLightBoostAsync(enabled)
-                        future.addListener({
-                            val result = runCatching { future.get() }
-                            if (!isDisposed && requestId == lowLightRequestId) {
-                                result
-                                    .onSuccess {
-                                        onLowLightBoostState(enabled)
-                                        onCaptureStatus(if (enabled) "저조도 부스트 활성화 · 어두운 환경에서 미리보기 보조" else "저조도 부스트 해제")
-                                    }
-                                    .onFailure { error ->
-                                        onLowLightBoostState(false)
-                                        onCaptureStatus("저조도 부스트 적용 실패: ${error.localizedMessage ?: "기기 설정 충돌"}")
-                                    }
-                            }
-                        }, mainExecutor)
+                        fun applyBoost() {
+                            val future = boundCamera.cameraControl.enableLowLightBoostAsync(enabled)
+                            future.addListener({
+                                val result = runCatching { future.get() }
+                                if (!isDisposed && requestId == lowLightRequestId) {
+                                    result
+                                        .onSuccess {
+                                            onLowLightBoostState(enabled)
+                                            onCaptureStatus(if (enabled) "저조도 부스트 활성화 · 어두운 환경에서 미리보기 보조" else "저조도 부스트 해제")
+                                        }
+                                        .onFailure { error ->
+                                            onLowLightBoostState(false)
+                                            onCaptureStatus("저조도 부스트 적용 실패: ${error.localizedMessage ?: "기기 설정 충돌"}")
+                                        }
+                                }
+                            }, mainExecutor)
+                        }
+                        if (enabled && boundCamera.cameraInfo.hasFlashUnit()) {
+                            val torchOffFuture = boundCamera.cameraControl.enableTorch(false)
+                            torchOffFuture.addListener({
+                                val torchOffResult = runCatching { torchOffFuture.get() }
+                                if (!isDisposed && requestId == lowLightRequestId) {
+                                    torchOffResult
+                                        .onSuccess {
+                                            onTorchInfo(false)
+                                            applyBoost()
+                                        }
+                                        .onFailure { error ->
+                                            onCaptureStatus("플래시를 끄지 못해 저조도 부스트를 적용하지 못했습니다: ${error.localizedMessage ?: "카메라 오류"}")
+                                        }
+                                }
+                            }, mainExecutor)
+                        } else {
+                            applyBoost()
+                        }
                     }
                 }
                 onTorchActionAvailable { enabled ->
                     if (boundCamera.cameraInfo.hasFlashUnit()) {
-                        boundCamera.cameraControl.enableTorch(enabled)
-                            .addListener({
-                                if (enabled) onLowLightBoostState(false)
-                                onTorchInfo(enabled)
-                            }, mainExecutor)
+                        val future = boundCamera.cameraControl.enableTorch(enabled)
+                        future.addListener({
+                            runCatching { future.get() }
+                                .onSuccess {
+                                    if (enabled) onLowLightBoostState(false)
+                                    onTorchInfo(enabled)
+                                }
+                                .onFailure { error ->
+                                    onCaptureStatus("플래시 설정 실패: ${error.localizedMessage ?: "카메라 오류"}")
+                                }
+                        }, mainExecutor)
                     }
                 }
                 previewView.setOnTouchListener { _, event ->
