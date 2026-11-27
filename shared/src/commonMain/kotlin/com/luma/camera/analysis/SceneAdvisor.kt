@@ -14,6 +14,7 @@ data class SceneAdviceInput(
     val subjectAreaRatio: Double = 0.0,
     val horizonTiltDegrees: Double = 0.0,
     val currentZoomRatio: Float = 1f,
+    val minZoomRatio: Float = 1f,
     val maxZoomRatio: Float = 1f,
     /** Display-relative pitch estimate from the rotation-vector sensor; guidance only. */
     val cameraPitchDegrees: Double = 0.0
@@ -38,8 +39,9 @@ object SceneAdvisor {
         val y = safe(input.subjectCenterY, 0.5).coerceIn(0.0, 1.0)
         val tilt = abs(safe(input.horizonTiltDegrees, 0.0))
         val pitch = safe(input.cameraPitchDegrees, 0.0).coerceIn(-90.0, 90.0)
-        val maxZoom = input.maxZoomRatio.takeIf { it.isFinite() && it >= 1f } ?: 1f
-        val currentZoom = input.currentZoomRatio.takeIf { it.isFinite() }?.coerceIn(1f, maxZoom) ?: 1f
+        val minZoom = input.minZoomRatio.takeIf { it.isFinite() && it > 0f } ?: 1f
+        val maxZoom = input.maxZoomRatio.takeIf { it.isFinite() && it >= minZoom } ?: minZoom
+        val currentZoom = input.currentZoomRatio.takeIf { it.isFinite() }?.coerceIn(minZoom, maxZoom) ?: minZoom
         val recommendations = mutableListOf<String>()
         val title: String
         val summary: String
@@ -113,9 +115,9 @@ object SceneAdvisor {
         }
 
         // Face-area zoom is only valid for portrait mode; never treat a face box as a generic object.
-        if (input.intent == ShootingIntent.PORTRAIT && area > 0.001 && maxZoom > 1.01f) {
+        if (input.intent == ShootingIntent.PORTRAIT && area > 0.001 && maxZoom > minZoom + 0.01f) {
             val targetFaceArea = 0.16
-            val ratio = (currentZoom * sqrt(targetFaceArea / area).toFloat()).coerceIn(1f, maxZoom)
+            val ratio = (currentZoom * sqrt(targetFaceArea / area).toFloat()).coerceIn(minZoom, maxZoom)
             if (abs(ratio - currentZoom) >= 0.08f) {
                 val direction = if (ratio > currentZoom) "줌 인" else "줌 아웃"
                 recommendations += "현재 얼굴 크기 기준 추천 배율 ${"%.1f".format(ratio)}× · $direction"
