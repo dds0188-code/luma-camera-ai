@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.luma.camera.analysis.ShootingIntent
 import com.luma.camera.analysis.WhiteBalancePreset
 import com.luma.camera.analysis.FocusPeakingPoint
+import com.luma.camera.analysis.ZebraMark
 import com.luma.camera.analysis.CaptureTimerOptions
 import com.luma.camera.analysis.CaptureBurstOptions
 import kotlin.math.abs
@@ -212,6 +213,16 @@ fun App(
                         ),
                         shape = CircleShape
                     ) { Text(if (focusPeakingEnabled) "초점 강조 ON" else "초점 강조 OFF", style = MaterialTheme.typography.labelSmall) }
+                    Button(
+                        onClick = { onZebraExposureToggle(!zebraExposureEnabled) },
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (zebraExposureEnabled) Warning else Panel,
+                            contentColor = if (zebraExposureEnabled) Color(0xFF10170B) else Muted
+                        ),
+                        shape = CircleShape
+                    ) { Text(if (zebraExposureEnabled) "ZEBRA ON" else "ZEBRA OFF", style = MaterialTheme.typography.labelSmall) }
                     listOf("삼분할", "중앙", "끄기").forEach { mode ->
                         val selected = gridMode == mode
                         Button(
@@ -238,6 +249,21 @@ fun App(
                                     color = Color(0xFF8DFF45).copy(alpha = 0.88f),
                                     radius = 2.1.dp.toPx(),
                                     center = Offset(point.x * size.width, point.y * size.height)
+                                )
+                            }
+                        }
+                    }
+                    if (zebraExposureEnabled && zebraMarks.isNotEmpty()) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            val half = 3.2.dp.toPx()
+                            zebraMarks.forEach { mark ->
+                                val center = Offset(mark.x * size.width, mark.y * size.height)
+                                drawLine(
+                                    color = Color(0xFFFFC34D).copy(alpha = 0.92f),
+                                    start = Offset(center.x - half, center.y + half),
+                                    end = Offset(center.x + half, center.y - half),
+                                    strokeWidth = 1.7.dp.toPx(),
+                                    cap = StrokeCap.Square
                                 )
                             }
                         }
