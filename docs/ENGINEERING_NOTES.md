@@ -102,3 +102,14 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - Capture filenames include milliseconds to reduce same-second filename collisions during rapid shooting.
 - A burst remains marked in progress until all requested shots have either saved or an error occurs, preventing overlapping sequences.
 - Hardware validation is still required to measure real inter-shot cadence and verify behavior on different CameraX camera implementations.
+
+
+## On-device scene recognition v1
+
+- Added the bundled ML Kit image-labeling model. It recognizes 400+ general labels locally and is available without a first-run model download; the trade-off is an approximately 5.7 MB increase to the Android app package according to Google's documentation.
+- Live face detection remains active. General scene labeling is throttled to at most once per second to limit inference load.
+- Camera analysis now runs on a dedicated single-thread executor rather than the main UI executor. Face and scene tasks share the same ImageProxy and the proxy is closed only after both tasks complete; synchronous setup failures also close it.
+- A common, deterministic SceneClassifier maps only strong, unambiguous labels to portrait, landscape, architecture, or food. It rejects low-confidence (<55%) and ambiguous candidates (less than 12 percentage points of margin).
+- The UI presents a candidate and confidence; the user explicitly applies the recommended shooting profile. This is not a claim of fully reliable scene understanding or generic object segmentation.
+- The model is bundled to preserve offline-first behavior. No captured frame is uploaded.
+- Physical-device performance, thermal impact, category accuracy, and low-light behavior still require validation.
