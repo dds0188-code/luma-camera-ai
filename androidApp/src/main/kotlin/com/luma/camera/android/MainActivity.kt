@@ -67,6 +67,7 @@ import com.luma.camera.analysis.CaptureTimerOptions
 import com.luma.camera.analysis.CaptureBurstOptions
 import com.luma.camera.analysis.ManualExposureOptions
 import com.luma.camera.analysis.ManualFocusOptions
+import com.luma.camera.analysis.ExposureMeterAnalyzer
 import com.luma.camera.analysis.CompositionAnalyzer
 import com.luma.camera.analysis.CompositionInput
 import com.luma.camera.analysis.PhotoQualityAnalyzer
@@ -113,6 +114,8 @@ private fun LumaCameraApplication() {
     var manualFocusEnabled by remember { mutableStateOf(false) }
     var manualFocusDistance by remember { mutableStateOf(0f) }
     var minimumFocusDistance by remember { mutableStateOf(0f) }
+    var exposureHistogram by remember { mutableStateOf(emptyList<Float>()) }
+    var exposureWarning by remember { mutableStateOf("노출 분포 분석 중…") }
     var torchAction by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
     var captureStatus by remember { mutableStateOf("카메라 초기화 중…") }
     var zoomRatio by remember { mutableStateOf(1f) }
