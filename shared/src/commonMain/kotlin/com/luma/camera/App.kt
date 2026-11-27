@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.luma.camera.analysis.ShootingIntent
+import com.luma.camera.analysis.WhiteBalancePreset
 import com.luma.camera.analysis.CaptureTimerOptions
 import com.luma.camera.analysis.CaptureBurstOptions
 import kotlin.math.abs
@@ -77,6 +78,9 @@ fun App(
     onManualFocusToggle: (Boolean) -> Unit = {},
     onManualFocusDistanceChange: (Float) -> Unit = {},
     onApplyManualFocus: () -> Unit = {},
+    whiteBalancePresets: List<WhiteBalancePreset> = emptyList(),
+    selectedWhiteBalancePreset: WhiteBalancePreset = WhiteBalancePreset.AUTO,
+    onWhiteBalancePresetChange: (WhiteBalancePreset) -> Unit = {},
     exposureHistogram: List<Float> = emptyList(),
     exposureWarning: String = "노출 분석 준비 중",
     horizonTiltDegrees: Float = 0f,
@@ -426,6 +430,37 @@ fun App(
                                     }
                                     Text("값이 클수록 가까운 피사체에 초점을 맞춥니다.", color = Muted, style = MaterialTheme.typography.labelSmall)
                                 }
+                            }
+                        }
+                        if (whiteBalancePresets.isNotEmpty()) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(PanelRaised).padding(11.dp),
+                                verticalArrangement = Arrangement.spacedBy(7.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("화이트밸런스", color = TextMain, fontWeight = FontWeight.SemiBold)
+                                    Spacer(Modifier.weight(1f))
+                                    Text(selectedWhiteBalancePreset.label, color = Accent, style = MaterialTheme.typography.labelSmall)
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    whiteBalancePresets.forEach { preset ->
+                                        val selected = selectedWhiteBalancePreset == preset
+                                        Button(
+                                            onClick = { onWhiteBalancePresetChange(preset) },
+                                            modifier = Modifier.height(32.dp),
+                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 11.dp, vertical = 0.dp),
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (selected) Accent else Panel,
+                                                contentColor = if (selected) Color(0xFF10170B) else TextMain
+                                            ),
+                                            shape = CircleShape
+                                        ) { Text(preset.label, style = MaterialTheme.typography.labelSmall) }
+                                    }
+                                }
+                                Text("현재 렌즈가 지원한다고 보고한 프리셋만 표시합니다.", color = Muted, style = MaterialTheme.typography.labelSmall)
                             }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
