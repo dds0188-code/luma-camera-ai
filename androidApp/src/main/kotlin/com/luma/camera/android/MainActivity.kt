@@ -823,11 +823,15 @@ private fun CameraPreview(
                         future.addListener({
                             runCatching { future.get() }
                                 .onSuccess {
-                                    if (enabled) onLowLightBoostState(false)
-                                    onTorchInfo(enabled)
+                                    if (!isDisposed) {
+                                        if (enabled) onLowLightBoostState(false)
+                                        onTorchInfo(enabled)
+                                    }
                                 }
                                 .onFailure { error ->
-                                    onCaptureStatus("플래시 설정 실패: ${error.localizedMessage ?: "카메라 오류"}")
+                                    if (!isDisposed) {
+                                        onCaptureStatus("플래시 설정 실패: ${error.localizedMessage ?: "카메라 오류"}")
+                                    }
                                 }
                         }, mainExecutor)
                     }
