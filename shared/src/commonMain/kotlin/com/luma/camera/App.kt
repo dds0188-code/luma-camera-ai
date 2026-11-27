@@ -70,6 +70,13 @@ fun App(
     onManualShutterChange: (Long) -> Unit = {},
     onManualExposureToggle: (Boolean) -> Unit = {},
     onApplyManualExposure: () -> Unit = {},
+    manualFocusSupported: Boolean = false,
+    manualFocusEnabled: Boolean = false,
+    manualFocusDistance: Float = 0f,
+    minimumFocusDistance: Float = 0f,
+    onManualFocusToggle: (Boolean) -> Unit = {},
+    onManualFocusDistanceChange: (Float) -> Unit = {},
+    onApplyManualFocus: () -> Unit = {},
     horizonTiltDegrees: Float = 0f,
     compositionGuidance: String = "피사체를 찾는 중입니다.",
     shootingIntent: ShootingIntent = ShootingIntent.PORTRAIT,
@@ -359,6 +366,40 @@ fun App(
                                         colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF10170B)),
                                         shape = CircleShape
                                     ) { Text("수동 설정 적용 · ISO $manualIso · ${"%.0f".format(1_000_000_000.0 / manualShutterNs)}분의 1초") }
+                                }
+                            }
+                        }
+                        if (manualFocusSupported) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(PanelRaised).padding(11.dp),
+                                verticalArrangement = Arrangement.spacedBy(7.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("수동 초점", color = TextMain, fontWeight = FontWeight.SemiBold)
+                                        Text(if (manualFocusEnabled) "렌즈 초점 위치 직접 제어" else "자동 초점 사용 중", color = Muted, style = MaterialTheme.typography.labelSmall)
+                                    }
+                                    Button(
+                                        onClick = { onManualFocusToggle(!manualFocusEnabled) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = if (manualFocusEnabled) Accent else Panel, contentColor = if (manualFocusEnabled) Color(0xFF10170B) else TextMain),
+                                        shape = CircleShape
+                                    ) { Text(if (manualFocusEnabled) "자동 AF" else "수동 MF") }
+                                }
+                                if (manualFocusEnabled) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("초점 거리", color = TextMain, modifier = Modifier.weight(1f))
+                                        Text(if (manualFocusDistance <= 0.001f) "∞" else "${"%.2f".format(manualFocusDistance)} D", color = Accent, fontWeight = FontWeight.Bold)
+                                    }
+                                    Slider(
+                                        value = manualFocusDistance.coerceIn(0f, minimumFocusDistance),
+                                        onValueChange = onManualFocusDistanceChange,
+                                        valueRange = 0f..minimumFocusDistance
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Button(onClick = { onManualFocusDistanceChange(0f) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Panel, contentColor = TextMain)) { Text("무한대") }
+                                        Button(onClick = onApplyManualFocus, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF10170B))) { Text("초점 적용") }
+                                    }
+                                    Text("값이 클수록 가까운 피사체에 초점을 맞춥니다.", color = Muted, style = MaterialTheme.typography.labelSmall)
                                 }
                             }
                         }
