@@ -749,6 +749,9 @@ private fun CameraPreview(
                 } else {
                     "수동 ISO·셔터 미지원 또는 제한"
                 }
+                val lowLightSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM &&
+                    boundCamera.cameraInfo.isLowLightBoostSupported()
+                onLowLightBoostSupport(lowLightSupported)
                 onCameraCapabilitySummary(
                     (if (lensFacing == CameraSelector.LENS_FACING_FRONT) "전면 카메라 · " else "후면 카메라 · ") +
                         (if (boundCamera.cameraInfo.hasFlashUnit()) "플래시 있음" else "플래시 없음") + "\n" +
@@ -776,9 +779,6 @@ private fun CameraPreview(
                 }
                 onTorchInfo(false)
                 onLowLightBoostState(false)
-                val lowLightSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM &&
-                    boundCamera.cameraInfo.isLowLightBoostSupported()
-                onLowLightBoostSupport(lowLightSupported)
                 onLowLightBoostActionAvailable { enabled ->
                     if (!lowLightSupported) {
                         onCaptureStatus("이 카메라는 저조도 부스트를 지원하지 않습니다.")
