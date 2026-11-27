@@ -294,7 +294,7 @@ private fun CameraPreview(
         }
     }
     val cameraProviderFuture = remember(context) { ProcessCameraProvider.getInstance(context) }
-    val detector = remember {
+    val detector = remember(lensFacing) {
         FaceDetection.getClient(
             FaceDetectorOptions.Builder()
                 .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
@@ -302,7 +302,7 @@ private fun CameraPreview(
                 .build()
         )
     }
-    val imageLabeler = remember { ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS) }
+    val imageLabeler = remember(lensFacing) { ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS) }
 
     DisposableEffect(lifecycleOwner, cameraProviderFuture, previewView, detector, imageLabeler, lensFacing) {
         var imageCapture: ImageCapture? = null
@@ -349,8 +349,11 @@ private fun CameraPreview(
                                             onFaceLost()
                                         } else {
                                             val bounds = face.boundingBox
-                                            val width = mediaImage.width.toDouble().coerceAtLeast(1.0)
-                                            val height = mediaImage.height.toDouble().coerceAtLeast(1.0)
+                                            val rotation = proxy.imageInfo.rotationDegrees
+                                            val rotatedWidth = if (rotation == 90 || rotation == 270) mediaImage.height else mediaImage.width
+                                            val rotatedHeight = if (rotation == 90 || rotation == 270) mediaImage.width else mediaImage.height
+                                            val width = rotatedWidth.toDouble().coerceAtLeast(1.0)
+                                            val height = rotatedHeight.toDouble().coerceAtLeast(1.0)
                                             val rawCenterX = (bounds.centerX() / width).coerceIn(0.0, 1.0)
                                             val centerX = if (lensFacing == CameraSelector.LENS_FACING_FRONT) 1.0 - rawCenterX else rawCenterX
                                             val centerY = (bounds.centerY() / height).coerceIn(0.0, 1.0)
