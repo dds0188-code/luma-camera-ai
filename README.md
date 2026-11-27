@@ -17,7 +17,7 @@
 
 ## 현재 기술 구성
 - 공통 UI/분석 로직: Kotlin Multiplatform + Compose Multiplatform
-- Android 카메라: CameraX
+- Android 카메라: CameraX 1.6.2 (CameraX Extensions 호환 기반)
 - Windows 카메라: Windows 네이티브 카메라 연동 구현 예정
 - 영상/기하 분석: OpenCV 도입 검토
 - 온디바이스 추론: LiteRT 또는 ONNX Runtime 검증 후 선정
@@ -52,6 +52,7 @@
 
 ## 최신 카메라 기능 추가
 - 상단에서 전면/후면 카메라를 전환할 수 있습니다. 전면 카메라에서는 미리보기 좌우 반전을 고려해 얼굴 구도 좌표를 보정합니다.
+- CameraX 모듈을 1.6.2로 통일해 2026년 11월 이후 일부 기기에서 제한되는 구버전 Extensions 호환 문제를 예방했습니다.
 
 ## 최신 AI 기능 추가
 - ML Kit 번들 이미지 라벨링 모델(400개 이상 라벨)을 앱에 포함해 네트워크/첫 실행 모델 다운로드 없이 장면을 분석합니다.
