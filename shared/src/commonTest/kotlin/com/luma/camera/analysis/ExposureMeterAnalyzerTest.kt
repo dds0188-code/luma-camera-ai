@@ -10,7 +10,7 @@ class ExposureMeterAnalyzerTest {
         val result = ExposureMeterAnalyzer.analyze(listOf(0, 15, 16, 31, 255))
         assertEquals(16, result.histogram.size)
         assertEquals(2, result.histogram[0])
-        assertEquals(1, result.histogram[1])
+        assertEquals(2, result.histogram[1])
         assertEquals(1, result.histogram[15])
     }
 
