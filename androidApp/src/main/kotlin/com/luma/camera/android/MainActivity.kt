@@ -252,6 +252,8 @@ private fun LumaCameraApplication() {
         },
         onManualFocusDistanceChange = { manualFocusDistance = it },
         onApplyManualFocus = { manualFocusAction?.invoke(true, manualFocusDistance) },
+        exposureHistogram = exposureHistogram,
+        exposureWarning = exposureWarning,
         horizonTiltDegrees = horizonTilt,
         compositionGuidance = guidance,
         shootingIntent = shootingIntent,
@@ -282,6 +284,10 @@ private fun LumaCameraApplication() {
                         minimumFocusDistance = maximum
                         manualFocusDistance = manualFocusDistance.coerceIn(0f, maximum)
                         if (!supported) manualFocusEnabled = false
+                    },
+                    onExposureMeter = { histogram, warning ->
+                        exposureHistogram = histogram
+                        exposureWarning = warning
                     },
                     onManualExposureSupport = { supported, minimum, maximum ->
                         manualExposureSupported = supported
@@ -340,6 +346,7 @@ private fun CameraPreview(
     onManualExposureActionAvailable: (((Boolean, Int, Long) -> Unit)?) -> Unit,
     onManualFocusActionAvailable: (((Boolean, Float) -> Unit)?) -> Unit,
     onManualFocusSupport: (Boolean, Float) -> Unit,
+    onExposureMeter: (List<Float>, String) -> Unit,
     onManualExposureSupport: (Boolean, Int, Int) -> Unit,
     onTorchActionAvailable: (((Boolean) -> Unit)?) -> Unit,
     onTorchInfo: (Boolean) -> Unit,
@@ -385,6 +392,7 @@ private fun CameraPreview(
         val analysisBusy = AtomicBoolean(false)
         val analysisExecutor = Executors.newSingleThreadExecutor()
         var lastSceneLabelTimestamp = 0L
+        var lastExposureMeterTimestamp = 0L
         val listener = Runnable {
             if (isDisposed) return@Runnable
             try {
@@ -406,6 +414,28 @@ private fun CameraPreview(
                     } else {
                         try {
                             val input = InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees)
+                            val meterNow = SystemClock.elapsedRealtime()
+                            if (meterNow - lastExposureMeterTimestamp >= 350L) {
+                                lastExposureMeterTimestamp = meterNow
+                                val plane = proxy.planes.firstOrNull()
+                                if (plane != null) {
+                                    val yBuffer = plane.buffer.duplicate()
+                                    val crop = proxy.cropRect
+                                    val samples = ArrayList<Int>(24 * 14)
+                                    for (row in 0 until 14) {
+                                        val y = crop.top + ((row + 0.5) * crop.height() / 14).toInt()
+                                        for (column in 0 until 24) {
+                                            val x = crop.left + ((column + 0.5) * crop.width() / 24).toInt()
+                                            val index = yBuffer.position() + y * plane.rowStride + x * plane.pixelStride
+                                            if (index in 0 until yBuffer.limit()) samples.add(yBuffer.get(index).toInt() and 0xFF)
+                                        }
+                                    }
+                                    if (samples.isNotEmpty()) {
+                                        val meter = ExposureMeterAnalyzer.analyze(samples)
+                                        mainExecutor.execute { if (!isDisposed) onExposureMeter(meter.histogram.map { it.toFloat() }, meter.warning) }
+                                    }
+                                }
+                            }
                             val faceTask = detector.process(input)
                             val now = SystemClock.elapsedRealtime()
                             val shouldLabelScene = now - lastSceneLabelTimestamp >= 1_000L
