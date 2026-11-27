@@ -55,6 +55,7 @@ import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.luma.camera.App
 import com.luma.camera.analysis.CaptureTimerOptions
+import com.luma.camera.analysis.CaptureBurstOptions
 import com.luma.camera.analysis.CompositionAnalyzer
 import com.luma.camera.analysis.CompositionInput
 import com.luma.camera.analysis.PhotoQualityAnalyzer
@@ -85,7 +86,7 @@ private fun LumaCameraApplication() {
     var hasCameraPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
-    var captureAction by remember { mutableStateOf<((Int) -> Unit)?>(null) }
+    var captureAction by remember { mutableStateOf<((Int, Int) -> Unit)?>(null) }
     var zoomAction by remember { mutableStateOf<((Float) -> Unit)?>(null) }
     var exposureAction by remember { mutableStateOf<((Int) -> Unit)?>(null) }
     var torchAction by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
@@ -106,6 +107,7 @@ private fun LumaCameraApplication() {
     var cameraCapabilitySummary by remember { mutableStateOf("카메라 지원 기능 확인 중…") }
     var torchEnabled by remember { mutableStateOf(false) }
     var captureTimerSeconds by remember { mutableStateOf(0) }
+    var captureBurstCount by remember { mutableStateOf(1) }
     var gridMode by remember { mutableStateOf("삼분할") }
     val qualityExecutor = remember { Executors.newSingleThreadExecutor() }
     DisposableEffect(qualityExecutor) { onDispose { qualityExecutor.shutdownNow() } }
@@ -175,9 +177,11 @@ private fun LumaCameraApplication() {
     }
 
     App(
-        onCaptureClick = { captureAction?.invoke(captureTimerSeconds) },
+        onCaptureClick = { captureAction?.invoke(captureTimerSeconds, captureBurstCount) },
         captureTimerSeconds = captureTimerSeconds,
         onCaptureTimerChange = { captureTimerSeconds = it },
+        captureBurstCount = captureBurstCount,
+        onCaptureBurstCountChange = { captureBurstCount = it },
         gridMode = gridMode,
         onGridModeChange = { gridMode = it },
         captureStatus = captureStatus,
@@ -235,7 +239,7 @@ private fun LumaCameraApplication() {
 
 @Composable
 private fun CameraPreview(
-    onCaptureActionAvailable: (((Int) -> Unit)?) -> Unit,
+    onCaptureActionAvailable: (((Int, Int) -> Unit)?) -> Unit,
     onCaptureStatus: (String) -> Unit,
     onZoomActionAvailable: (((Float) -> Unit)?) -> Unit,
     onExposureActionAvailable: (((Int) -> Unit)?) -> Unit,
@@ -400,7 +404,7 @@ private fun CameraPreview(
                     }
                 }
                 onCaptureStatus("후면 카메라 연결됨 · 얼굴 분석 및 터치 초점 준비")
-                fun captureNow() {
+                fun captureNow(remainingShots: Int, totalShots: Int) {
                     val activeCapture = imageCapture
                     if (activeCapture == null) {
                         isCapturing = false
@@ -408,26 +412,32 @@ private fun CameraPreview(
                         return
                     }
                     activeCapture.targetRotation = previewView.display?.rotation ?: Surface.ROTATION_0
-                    onCaptureStatus("사진 촬영 중…")
+                    val completedShots = totalShots - remainingShots
+                    onCaptureStatus(if (totalShots > 1) "연속 촬영 중 · ${completedShots + 1}/$totalShots" else "사진 촬영 중…")
                     saveCapture(activeCapture, context, mainExecutor,
                         onSaved = { uri ->
-                            isCapturing = false
-                            onCaptureStatus("저장 완료 · 사진 품질 분석 중…")
-                            onPhotoQualitySummary("저장된 사진을 기기 안에서 분석하고 있습니다.")
-                            onPhotoQualityLines(emptyList())
-                            analyzeSavedPhoto(uri, context, qualityExecutor, mainExecutor,
-                                onResult = { result ->
-                                    onPhotoQualitySummary("종합 ${result.score}점 · 노출 ${result.exposureScore}점 · 명암 ${result.contrastScore}점 · 디테일 ${result.detailScore}점")
-                                    onPhotoQualityLines(result.suggestions)
-                                    onCaptureStatus("저장 및 사진 품질 분석 완료 · 갤러리에서도 확인할 수 있습니다.")
-                                },
-                                onFailure = { message ->
-                                    onPhotoQualitySummary("사진은 저장됐지만 분석하지 못했습니다.")
-                                    onPhotoQualityLines(listOf(message))
-                                    onCaptureStatus("사진 저장 완료 · 품질 분석은 실패했습니다.")
-                                }
-                            )
-                            Log.i(TAG, "Photo saved: $uri")
+                            if (remainingShots > 1) {
+                                onCaptureStatus("연속 촬영 저장 중 · ${completedShots + 1}/$totalShots")
+                                captureNow(remainingShots - 1, totalShots)
+                            } else {
+                                isCapturing = false
+                                onCaptureStatus("저장 완료 · 사진 품질 분석 중…")
+                                onPhotoQualitySummary("저장된 사진을 기기 안에서 분석하고 있습니다.")
+                                onPhotoQualityLines(emptyList())
+                                analyzeSavedPhoto(uri, context, qualityExecutor, mainExecutor,
+                                    onResult = { result ->
+                                        onPhotoQualitySummary("종합 ${result.score}점 · 노출 ${result.exposureScore}점 · 명암 ${result.contrastScore}점 · 디테일 ${result.detailScore}점")
+                                        onPhotoQualityLines(result.suggestions)
+                                        onCaptureStatus(if (totalShots > 1) "${totalShots}장 저장 및 마지막 사진 분석 완료" else "저장 및 사진 품질 분석 완료 · 갤러리에서도 확인할 수 있습니다.")
+                                    },
+                                    onFailure = { message ->
+                                        onPhotoQualitySummary("사진은 저장됐지만 분석하지 못했습니다.")
+                                        onPhotoQualityLines(listOf(message))
+                                        onCaptureStatus("사진 저장 완료 · 품질 분석은 실패했습니다.")
+                                    }
+                                )
+                                Log.i(TAG, "Photo saved: $uri")
+                            }
                         },
                         onFailure = { message ->
                             isCapturing = false
@@ -436,14 +446,15 @@ private fun CameraPreview(
                         }
                     )
                 }
-                onCaptureActionAvailable { delaySeconds ->
+                onCaptureActionAvailable { delaySeconds, requestedBurstCount ->
                     if (isCapturing) {
                         onCaptureStatus("카운트다운 또는 촬영이 이미 진행 중입니다.")
                     } else {
                         isCapturing = true
                         val safeDelay = CaptureTimerOptions.normalize(delaySeconds)
+                        val burstCount = CaptureBurstOptions.normalize(requestedBurstCount)
                         if (safeDelay == 0) {
-                            captureNow()
+                            captureNow(burstCount, burstCount)
                         } else {
                             var remaining = safeDelay
                             lateinit var tick: Runnable
@@ -451,9 +462,9 @@ private fun CameraPreview(
                                 if (isDisposed) return@Runnable
                                 if (remaining <= 0) {
                                     countdownRunnable = null
-                                    captureNow()
+                                    captureNow(burstCount, burstCount)
                                 } else {
-                                    onCaptureStatus("${remaining}초 후 자동 촬영")
+                                    onCaptureStatus("${remaining}초 후 ${burstCount}장 촬영")
                                     remaining -= 1
                                     timerHandler.postDelayed(tick, 1000L)
                                 }
