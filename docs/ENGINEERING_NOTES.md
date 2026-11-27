@@ -150,3 +150,15 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - This is a downsampled preview-luma guide, not a calibrated RAW histogram, waveform, zebra overlay, or final-capture exposure guarantee. UI explicitly communicates this limitation.
 - Histogram samples are computed on the dedicated ImageAnalysis executor; only the compact histogram and warning are posted to the main executor. The existing KEEP_ONLY_LATEST strategy and shared analysis busy gate remain in place.
 - Shared tests cover histogram binning, clipping warnings, empty samples, and out-of-range sample rejection. Manual focus normalization has separate common tests.
+
+
+## Focus peaking and white-balance presets
+
+- Added an opt-in focus-assist overlay. While enabled, the CameraX analysis path samples the Y plane on a 40x30 grid no more often than every 250 ms and runs a bounded edge-emphasis pass. At most 420 normalized points are sent to Compose for a green overlay.
+- The overlay is intentionally disabled by default. The analyzer re-reads the latest Compose toggle state without rebinding the camera, and points are cleared when disabled or when the lens changes.
+- Coordinates are rotated to match the analysis frame orientation and horizontally mirrored for the front camera. Preview crop/scale differences and OEM-specific image transforms still require physical-device alignment checks.
+- Focus peaking is a high-local-contrast visualization, not a calibrated focus metric. Texture, noise, sharpening, and scene contrast can also create highlighted points; the UI should describe it as a focus aid rather than proof that a pixel is in focus.
+- Common tests cover edge detection, normalized coordinate bounds, rotation/mirroring, and invalid inputs.
+- Added Camera2 white-balance presets only for modes listed in the active camera's CONTROL_AWB_AVAILABLE_MODES. This uses AWB mode requests, not manual color-temperature/Kelvin or custom color-correction gains. Lens switching refreshes the supported list.
+- Manual exposure clears Camera2 interop request options; after returning to automatic exposure, the app reapplies the selected white-balance preset and any enabled manual focus setting.
+- CI must pass for shared tests, Android APK assembly, Windows desktop compilation, and MSI packaging before treating this batch as build-verified. Device-level preview overlay alignment and focus usefulness remain unverified until tested on physical phones.
