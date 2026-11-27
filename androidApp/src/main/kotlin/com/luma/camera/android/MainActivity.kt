@@ -176,6 +176,9 @@ private fun LumaCameraApplication() {
         whiteBalanceAction = null
         whiteBalancePresets = emptyList()
         selectedWhiteBalancePreset = WhiteBalancePreset.AUTO
+        lowLightBoostSupported = false
+        lowLightBoostEnabled = false
+        lowLightBoostAction = null
         focusPeakingPoints = emptyList()
         zebraMarks = emptyList()
     }
