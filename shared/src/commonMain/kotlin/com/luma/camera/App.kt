@@ -88,6 +88,12 @@ fun App(
     focusPeakingEnabled: Boolean = false,
     focusPeakingPoints: List<FocusPeakingPoint> = emptyList(),
     onFocusPeakingToggle: (Boolean) -> Unit = {},
+    zebraExposureEnabled: Boolean = false,
+    zebraMarks: List<ZebraMark> = emptyList(),
+    onZebraExposureToggle: (Boolean) -> Unit = {},
+    lowLightBoostSupported: Boolean = false,
+    lowLightBoostEnabled: Boolean = false,
+    onLowLightBoostToggle: (Boolean) -> Unit = {},
     horizonTiltDegrees: Float = 0f,
     compositionGuidance: String = "피사체를 찾는 중입니다.",
     shootingIntent: ShootingIntent = ShootingIntent.PORTRAIT,
@@ -223,6 +229,21 @@ fun App(
                         ),
                         shape = CircleShape
                     ) { Text(if (zebraExposureEnabled) "ZEBRA ON" else "ZEBRA OFF", style = MaterialTheme.typography.labelSmall) }
+                    if (lowLightBoostSupported) {
+                        Button(
+                            onClick = { onLowLightBoostToggle(!lowLightBoostEnabled) },
+                            enabled = !manualExposureEnabled || lowLightBoostEnabled,
+                            modifier = Modifier.height(32.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (lowLightBoostEnabled) Color(0xFF9AD7FF) else Panel,
+                                contentColor = if (lowLightBoostEnabled) Color(0xFF08131B) else Muted,
+                                disabledContainerColor = Panel,
+                                disabledContentColor = Muted.copy(alpha = 0.45f)
+                            ),
+                            shape = CircleShape
+                        ) { Text(if (lowLightBoostEnabled) "저조도 ON" else "저조도", style = MaterialTheme.typography.labelSmall) }
+                    }
                     listOf("삼분할", "중앙", "끄기").forEach { mode ->
                         val selected = gridMode == mode
                         Button(
