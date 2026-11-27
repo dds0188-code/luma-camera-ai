@@ -448,7 +448,10 @@ private fun CameraPreview(
                     ?: intArrayOf()
                 val manualSensorSupported = capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
                 val camera2Control = runCatching { Camera2CameraControl.from(boundCamera.cameraControl) }.getOrNull()
-                val manualExposureAvailable = manualSensorSupported && isoRange != null && shutterRange != null && camera2Control != null
+                val manualExposureAvailable = manualSensorSupported &&
+                    isoRange != null && isoRange.lower > 0 &&
+                    shutterRange != null && shutterRange.lower > 0 &&
+                    camera2Control != null
                 onManualExposureSupport(manualExposureAvailable, isoRange?.lower ?: 100, isoRange?.upper ?: 800)
                 onManualExposureActionAvailable { enabled, requestedIso, requestedShutterNs ->
                     if (!manualExposureAvailable || camera2Control == null) {
