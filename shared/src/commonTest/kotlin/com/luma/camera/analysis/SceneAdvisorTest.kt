@@ -7,14 +7,19 @@ import kotlin.test.assertTrue
 
 class SceneAdvisorTest {
     @Test fun portraitSuggestsZoomFromDetectedFaceArea() {
-        val advice = SceneAdvisor.advise(SceneAdviceInput(ShootingIntent.PORTRAIT, subjectAreaRatio = 0.04, currentZoomRatio = 1f, maxZoomRatio = 4f))
+        val advice = SceneAdvisor.advise(SceneAdviceInput(ShootingIntent.PORTRAIT, subjectAreaRatio = 0.04, currentZoomRatio = 1f, minZoomRatio = 0.5f, maxZoomRatio = 4f))
         assertEquals(2f, advice.suggestedZoomRatio)
         assertTrue(advice.recommendations.any { it.contains("추천 배율") })
     }
 
     @Test fun zoomRecommendationNeverExceedsCameraCapability() {
-        val advice = SceneAdvisor.advise(SceneAdviceInput(ShootingIntent.PORTRAIT, subjectAreaRatio = 0.01, currentZoomRatio = 1f, maxZoomRatio = 1.5f))
+        val advice = SceneAdvisor.advise(SceneAdviceInput(ShootingIntent.PORTRAIT, subjectAreaRatio = 0.01, currentZoomRatio = 1f, minZoomRatio = 0.5f, maxZoomRatio = 1.5f))
         assertEquals(1.5f, advice.suggestedZoomRatio)
+    }
+
+    @Test fun zoomRecommendationRespectsDeviceMinimumBelowOneX() {
+        val advice = SceneAdvisor.advise(SceneAdviceInput(ShootingIntent.PORTRAIT, subjectAreaRatio = 0.8, currentZoomRatio = 1f, minZoomRatio = 0.5f, maxZoomRatio = 4f))
+        assertEquals(0.5f, advice.suggestedZoomRatio)
     }
 
     @Test fun landscapeDoesNotInventFaceBasedZoom() {
