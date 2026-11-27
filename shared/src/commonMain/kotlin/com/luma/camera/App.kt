@@ -49,6 +49,8 @@ private val Warning = Color(0xFFFFC477)
 @Composable
 fun App(
     cameraPreview: @Composable () -> Unit = { PreviewPlaceholder() },
+    isFrontCamera: Boolean = false,
+    onToggleCamera: () -> Unit = {},
     onCaptureClick: () -> Unit = {},
     captureStatus: String = "카메라 연결 대기 중",
     zoomRatio: Float = 1f,
@@ -101,6 +103,13 @@ fun App(
                         Text("LUMA CAMERA", color = TextMain, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text("온디바이스 촬영 어시스턴트", color = Muted, style = MaterialTheme.typography.labelSmall)
                     }
+                    Button(
+                        onClick = onToggleCamera,
+                        modifier = Modifier.height(34.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 11.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PanelRaised, contentColor = Accent),
+                        shape = CircleShape
+                    ) { Text(if (isFrontCamera) "전면" else "후면", style = MaterialTheme.typography.labelSmall) }
                     Row(
                         modifier = Modifier.clip(CircleShape).background(Panel).padding(horizontal = 10.dp, vertical = 7.dp),
                         verticalAlignment = Alignment.CenterVertically,
