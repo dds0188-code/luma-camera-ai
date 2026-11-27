@@ -57,6 +57,7 @@ fun App(
     onCaptureClick: () -> Unit = {},
     captureStatus: String = "카메라 연결 대기 중",
     zoomRatio: Float = 1f,
+    minZoomRatio: Float = 1f,
     maxZoomRatio: Float = 1f,
     onZoomChange: (Float) -> Unit = {},
     exposureIndex: Int = 0,
@@ -385,13 +386,13 @@ fun App(
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("줌  ${"%.1f".format(zoomRatio)}×", color = TextMain, modifier = Modifier.weight(1f))
-                            Text("최대 ${"%.1f".format(maxZoomRatio)}×", color = Muted, style = MaterialTheme.typography.labelSmall)
+                            Text("${"%.1f".format(minZoomRatio)}× – ${"%.1f".format(maxZoomRatio)}×", color = Muted, style = MaterialTheme.typography.labelSmall)
                         }
                         Slider(
-                            value = zoomRatio.coerceIn(1f, maxZoomRatio.coerceAtLeast(1f)),
+                            value = zoomRatio.coerceIn(minZoomRatio, maxZoomRatio.coerceAtLeast(minZoomRatio)),
                             onValueChange = onZoomChange,
-                            valueRange = 1f..maxZoomRatio.coerceAtLeast(1.01f),
-                            enabled = maxZoomRatio > 1.01f
+                            valueRange = minZoomRatio..maxZoomRatio.coerceAtLeast(minZoomRatio + 0.01f),
+                            enabled = maxZoomRatio > minZoomRatio + 0.01f
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("노출 보정", color = TextMain, modifier = Modifier.weight(1f))
