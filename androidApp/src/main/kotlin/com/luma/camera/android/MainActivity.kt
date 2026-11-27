@@ -145,6 +145,7 @@ private fun LumaCameraApplication() {
     var faceCenterY by remember { mutableStateOf(0.5) }
     var faceArea by remember { mutableStateOf(0.0) }
     var horizonTilt by remember { mutableStateOf(0f) }
+    var cameraPitchDegrees by remember { mutableStateOf(0f) }
     var shootingIntent by remember { mutableStateOf(ShootingIntent.PORTRAIT) }
     var photoQualitySummary by remember { mutableStateOf("") }
     var photoQualityLines by remember { mutableStateOf(emptyList<String>()) }
@@ -201,6 +202,7 @@ private fun LumaCameraApplication() {
                 }
                 if (SensorManager.remapCoordinateSystem(rotation, axes.first, axes.second, remapped)) {
                     SensorManager.getOrientation(remapped, orientation)
+                    cameraPitchDegrees = Math.toDegrees(orientation[1].toDouble()).toFloat().coerceIn(-90f, 90f)
                     val degrees = Math.toDegrees(orientation[2].toDouble()).toFloat()
                     horizonTilt = if (abs(degrees) > 90f) (if (degrees > 0) degrees - 180f else degrees + 180f) else degrees
                 }
@@ -217,13 +219,14 @@ private fun LumaCameraApplication() {
     val compositionHint = composition.suggestions.firstOrNull() ?: "현재 구도를 유지하며 촬영해 보세요."
     val sceneAdvice = SceneAdvisor.advise(
         SceneAdviceInput(
-            intent = shootingIntent,
+            intent = recognizedShootingIntent ?: shootingIntent,
             subjectCenterX = faceCenterX,
             subjectCenterY = faceCenterY,
             subjectAreaRatio = faceArea,
             horizonTiltDegrees = horizonTilt.toDouble(),
             currentZoomRatio = zoomRatio,
-            maxZoomRatio = maxZoomRatio
+            maxZoomRatio = maxZoomRatio,
+            cameraPitchDegrees = cameraPitchDegrees.toDouble()
         )
     )
     val guidance = if (faceArea <= 0.0) faceGuidance else {
