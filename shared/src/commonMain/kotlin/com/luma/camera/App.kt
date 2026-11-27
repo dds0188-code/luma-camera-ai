@@ -77,6 +77,8 @@ fun App(
     onManualFocusToggle: (Boolean) -> Unit = {},
     onManualFocusDistanceChange: (Float) -> Unit = {},
     onApplyManualFocus: () -> Unit = {},
+    exposureHistogram: List<Float> = emptyList(),
+    exposureWarning: String = "노출 분석 준비 중",
     horizonTiltDegrees: Float = 0f,
     compositionGuidance: String = "피사체를 찾는 중입니다.",
     shootingIntent: ShootingIntent = ShootingIntent.PORTRAIT,
@@ -367,6 +369,29 @@ fun App(
                                         shape = CircleShape
                                     ) { Text("수동 설정 적용 · ISO $manualIso · ${"%.0f".format(1_000_000_000.0 / manualShutterNs)}분의 1초") }
                                 }
+                            }
+                        }
+                        if (exposureHistogram.isNotEmpty()) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(PanelRaised).padding(11.dp),
+                                verticalArrangement = Arrangement.spacedBy(7.dp)
+                            ) {
+                                Text("실시간 노출 히스토그램", color = TextMain, fontWeight = FontWeight.SemiBold)
+                                Canvas(modifier = Modifier.fillMaxWidth().height(64.dp)) {
+                                    val maxBin = exposureHistogram.maxOrNull()?.coerceAtLeast(1f) ?: 1f
+                                    val gap = 2.dp.toPx()
+                                    val barWidth = ((size.width - gap * (exposureHistogram.size - 1)) / exposureHistogram.size).coerceAtLeast(1f)
+                                    exposureHistogram.forEachIndexed { index, value ->
+                                        val height = size.height * (value / maxBin).coerceIn(0f, 1f)
+                                        drawRect(
+                                            color = if (index <= 2 || index >= 13) Warning.copy(alpha = 0.9f) else Accent.copy(alpha = 0.85f),
+                                            topLeft = Offset(index * (barWidth + gap), size.height - height),
+                                            size = androidx.compose.ui.geometry.Size(barWidth, height)
+                                        )
+                                    }
+                                }
+                                Text(exposureWarning, color = if (exposureWarning.startsWith("주의")) Warning else Muted, style = MaterialTheme.typography.labelSmall)
+                                Text("미리보기 밝기 샘플 기반 참고값 · 최종 사진의 RAW 노출 측정값은 아닙니다.", color = Muted, style = MaterialTheme.typography.labelSmall)
                             }
                         }
                         if (manualFocusSupported) {
