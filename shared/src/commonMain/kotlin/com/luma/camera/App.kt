@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.luma.camera.analysis.ShootingIntent
 import com.luma.camera.analysis.WhiteBalancePreset
+import com.luma.camera.analysis.FocusPeakingPoint
 import com.luma.camera.analysis.CaptureTimerOptions
 import com.luma.camera.analysis.CaptureBurstOptions
 import kotlin.math.abs
@@ -83,6 +84,9 @@ fun App(
     onWhiteBalancePresetChange: (WhiteBalancePreset) -> Unit = {},
     exposureHistogram: List<Float> = emptyList(),
     exposureWarning: String = "노출 분석 준비 중",
+    focusPeakingEnabled: Boolean = false,
+    focusPeakingPoints: List<FocusPeakingPoint> = emptyList(),
+    onFocusPeakingToggle: (Boolean) -> Unit = {},
     horizonTiltDegrees: Float = 0f,
     compositionGuidance: String = "피사체를 찾는 중입니다.",
     shootingIntent: ShootingIntent = ShootingIntent.PORTRAIT,
@@ -198,6 +202,16 @@ fun App(
                         ) { Text(if (count == 1) "1장" else "${count}연사", style = MaterialTheme.typography.labelSmall) }
                     }
                     Spacer(Modifier.weight(1f))
+                    Button(
+                        onClick = { onFocusPeakingToggle(!focusPeakingEnabled) },
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (focusPeakingEnabled) Accent else Panel,
+                            contentColor = if (focusPeakingEnabled) Color(0xFF10170B) else Muted
+                        ),
+                        shape = CircleShape
+                    ) { Text(if (focusPeakingEnabled) "초점 강조 ON" else "초점 강조 OFF", style = MaterialTheme.typography.labelSmall) }
                     listOf("삼분할", "중앙", "끄기").forEach { mode ->
                         val selected = gridMode == mode
                         Button(
@@ -217,6 +231,17 @@ fun App(
                         .clip(RoundedCornerShape(25.dp)).background(PanelRaised)
                 ) {
                     cameraPreview()
+                    if (focusPeakingEnabled && focusPeakingPoints.isNotEmpty()) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            focusPeakingPoints.forEach { point ->
+                                drawCircle(
+                                    color = Color(0xFF8DFF45).copy(alpha = 0.88f),
+                                    radius = 2.1.dp.toPx(),
+                                    center = Offset(point.x * size.width, point.y * size.height)
+                                )
+                            }
+                        }
+                    }
                     CompositionGrid(Modifier.fillMaxSize(), gridMode)
                     Row(
                         modifier = Modifier.align(Alignment.TopStart).padding(12.dp)
