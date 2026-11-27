@@ -170,3 +170,11 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - The shared analyzer validates sample count, luminance range, threshold, rotation and output bound. Common tests cover threshold inclusivity, coordinate rotation/front-camera mirroring, invalid samples and output limiting.
 - The overlay is disabled by default and reads the latest Compose toggle state without rebinding the camera. It shares the existing ImageAnalysis executor, KEEP_ONLY_LATEST strategy and analysis busy gate with face detection, scene labeling, histogram and focus peaking.
 - This is a preview-luma warning, not RAW clipping detection or a guarantee of highlight loss in the saved JPEG. The overlay uses normalized analysis-frame coordinates; PreviewView FILL_CENTER crop/scale differences and OEM transforms still require physical-device alignment checks.
+
+
+## CameraX low-light boost
+
+- The low-light control is exposed only on Android 15+ when the active CameraX camera reports `isLowLightBoostSupported()`. The toggle state changes only after the `enableLowLightBoostAsync()` future succeeds.
+- CameraX documents low-light boost and torch as mutually exclusive with last-setting-wins behavior. Enabling torch clears the app's boost state; enabling boost requests torch-off first. Manual ISO/shutter mode is guarded because it disables automatic exposure, which conflicts with the AE-priority low-light mode.
+- The feature brightens preview and analysis streams dynamically in low light. It is not the CameraX Night extension's multi-frame still-photo fusion. Device support and visible improvement must be verified on physical hardware.
+- A source audit found the previous Zebra UI referenced its state and callback without declaring them in the shared App parameter list. The shared UI API has now been repaired and explicitly declares the Zebra and Low Light Boost state/callbacks.
