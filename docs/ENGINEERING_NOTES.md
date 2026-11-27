@@ -140,3 +140,13 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - Automatic mode clears the interop request options. The exposure-compensation slider is disabled while manual exposure is active because AE compensation is not meaningful with AE disabled.
 - Switching between front/rear cameras resets manual exposure mode to Auto; each lens is independently capability-checked. No support is assumed from a different camera.
 - Device-specific caveat: the app build can validate API usage but cannot guarantee a particular OEM camera HAL accepts manual requests. Physical validation is still required on each target phone/lens. Unsupported cameras keep the manual panel hidden.
+
+
+## Manual focus and live exposure histogram
+
+- Added manual lens focus only when the active camera reports MANUAL_SENSOR capability, a finite positive LENS_INFO_MINIMUM_FOCUS_DISTANCE, and Camera2CameraControl interop is available. Values are diopters from 0 (infinity) through the lens-reported maximum.
+- Manual focus uses CONTROL_AF_MODE_OFF plus LENS_FOCUS_DISTANCE. Returning to auto focus switches CONTROL_AF_MODE_CONTINUOUS_PICTURE. Lens support is re-evaluated on every camera switch.
+- Added a low-cost preview luminance meter: sample 24x14 points from the Y plane at most every 350 ms, build a 16-bin histogram, and warn when at least 12% of samples are near black (<=5) or near white (>=250).
+- This is a downsampled preview-luma guide, not a calibrated RAW histogram, waveform, zebra overlay, or final-capture exposure guarantee. UI explicitly communicates this limitation.
+- Histogram samples are computed on the dedicated ImageAnalysis executor; only the compact histogram and warning are posted to the main executor. The existing KEEP_ONLY_LATEST strategy and shared analysis busy gate remain in place.
+- Shared tests cover histogram binning, clipping warnings, empty samples, and out-of-range sample rejection. Manual focus normalization has separate common tests.
