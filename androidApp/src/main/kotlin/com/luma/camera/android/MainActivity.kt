@@ -25,6 +25,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.Camera2CameraControl
+import androidx.camera.camera2.interop.CaptureRequestOptions
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
+import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CameraCharacteristics
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
@@ -96,6 +100,12 @@ private fun LumaCameraApplication() {
     var captureAction by remember { mutableStateOf<((Int, Int) -> Unit)?>(null) }
     var zoomAction by remember { mutableStateOf<((Float) -> Unit)?>(null) }
     var exposureAction by remember { mutableStateOf<((Int) -> Unit)?>(null) }
+    var manualExposureAction by remember { mutableStateOf<((Boolean, Int, Long) -> Unit)?>(null) }
+    var manualExposureSupported by remember { mutableStateOf(false) }
+    var manualExposureEnabled by remember { mutableStateOf(false) }
+    var manualIsoRange by remember { mutableStateOf(100..800) }
+    var manualIso by remember { mutableStateOf(100) }
+    var manualShutterNs by remember { mutableStateOf(16_666_667L) }
     var torchAction by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
     var captureStatus by remember { mutableStateOf("카메라 초기화 중…") }
     var zoomRatio by remember { mutableStateOf(1f) }
@@ -204,6 +214,19 @@ private fun LumaCameraApplication() {
         minExposureIndex = minExposureIndex,
         maxExposureIndex = maxExposureIndex,
         onExposureChange = { exposureAction?.invoke(it) },
+        manualExposureSupported = manualExposureSupported,
+        manualExposureEnabled = manualExposureEnabled,
+        manualIso = manualIso,
+        manualIsoMin = manualIsoRange.first,
+        manualIsoMax = manualIsoRange.last,
+        manualShutterNs = manualShutterNs,
+        onManualIsoChange = { manualIso = it },
+        onManualShutterChange = { manualShutterNs = it },
+        onManualExposureToggle = { enabled ->
+            manualExposureEnabled = enabled
+            manualExposureAction?.invoke(enabled, manualIso, manualShutterNs)
+        },
+        onApplyManualExposure = { manualExposureAction?.invoke(true, manualIso, manualShutterNs) },
         horizonTiltDegrees = horizonTilt,
         compositionGuidance = guidance,
         shootingIntent = shootingIntent,
@@ -227,6 +250,16 @@ private fun LumaCameraApplication() {
                     onCaptureStatus = { captureStatus = it },
                     onZoomActionAvailable = { zoomAction = it },
                     onExposureActionAvailable = { exposureAction = it },
+                    onManualExposureActionAvailable = { manualExposureAction = it },
+                    onManualExposureSupport = { supported, minimum, maximum ->
+                        manualExposureSupported = supported
+                        if (supported) {
+                            manualIsoRange = minimum..maximum
+                            manualIso = manualIso.coerceIn(minimum, maximum)
+                        } else {
+                            manualExposureEnabled = false
+                        }
+                    },
                     onTorchActionAvailable = { torchAction = it },
                     onTorchInfo = { torchEnabled = it },
                     onZoomInfo = { current, maximum -> zoomRatio = current; maxZoomRatio = maximum },
@@ -271,6 +304,8 @@ private fun CameraPreview(
     onCaptureStatus: (String) -> Unit,
     onZoomActionAvailable: (((Float) -> Unit)?) -> Unit,
     onExposureActionAvailable: (((Int) -> Unit)?) -> Unit,
+    onManualExposureActionAvailable: (((Boolean, Int, Long) -> Unit)?) -> Unit,
+    onManualExposureSupport: (Boolean, Int, Int) -> Unit,
     onTorchActionAvailable: (((Boolean) -> Unit)?) -> Unit,
     onTorchInfo: (Boolean) -> Unit,
     onZoomInfo: (Float, Float) -> Unit,
@@ -405,6 +440,29 @@ private fun CameraPreview(
                 val capabilities = camera2Info.getCameraCharacteristic(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
                     ?: intArrayOf()
                 val manualSensorSupported = capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
+                val manualExposureAvailable = manualSensorSupported && isoRange != null && shutterRange != null
+                onManualExposureSupport(manualExposureAvailable, isoRange?.lower ?: 100, isoRange?.upper ?: 800)
+                val camera2Control = Camera2CameraControl.from(boundCamera.cameraControl)
+                onManualExposureActionAvailable { enabled, requestedIso, requestedShutterNs ->
+                    if (!manualExposureAvailable) {
+                        onCaptureStatus("이 카메라는 수동 ISO·셔터를 지원하지 않습니다.")
+                    } else if (!enabled) {
+                        camera2Control.clearCaptureRequestOptions().addListener({
+                            onCaptureStatus("자동 노출 모드로 전환했습니다.")
+                        }, mainExecutor)
+                    } else {
+                        val safeIso = requestedIso.coerceIn(isoRange!!.lower, isoRange.upper)
+                        val safeShutterNs = requestedShutterNs.coerceIn(shutterRange!!.lower, shutterRange.upper)
+                        val options = CaptureRequestOptions.Builder()
+                            .setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
+                            .setCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY, safeIso)
+                            .setCaptureRequestOption(CaptureRequest.SENSOR_EXPOSURE_TIME, safeShutterNs)
+                            .build()
+                        camera2Control.addCaptureRequestOptions(options).addListener({
+                            onCaptureStatus("수동 노출 적용 · ISO $safeIso · ${"%.1f".format(safeShutterNs / 1_000_000.0)} ms")
+                        }, mainExecutor)
+                    }
+                }
                 val awbNames = awbModes.toList().mapNotNull { mode ->
                     when (mode) {
                         CameraCharacteristics.CONTROL_AWB_MODE_AUTO -> "자동"
@@ -546,6 +604,8 @@ private fun CameraPreview(
                 onCaptureActionAvailable(null)
                 onZoomActionAvailable(null)
                 onExposureActionAvailable(null)
+                onManualExposureActionAvailable(null)
+                onManualExposureSupport(false, 100, 800)
                 onTorchActionAvailable(null)
                 onCaptureStatus("카메라 연결 실패: ${error.localizedMessage ?: "알 수 없는 오류"}")
                 Log.e(TAG, "Camera binding failed", error)
@@ -560,6 +620,8 @@ private fun CameraPreview(
             onCaptureActionAvailable(null)
             onZoomActionAvailable(null)
             onExposureActionAvailable(null)
+            onManualExposureActionAvailable(null)
+            onManualExposureSupport(false, 100, 800)
             onTorchActionAvailable(null)
             previewView.setOnTouchListener(null)
             imageAnalysis?.clearAnalyzer()
