@@ -178,3 +178,10 @@ Scores must not be presented as objective artistic truth. The on-screen thirds g
 - CameraX documents low-light boost and torch as mutually exclusive with last-setting-wins behavior. Enabling torch clears the app's boost state; enabling boost requests torch-off first. Manual ISO/shutter mode is guarded because it disables automatic exposure, which conflicts with the AE-priority low-light mode.
 - The feature brightens preview and analysis streams dynamically in low light. It is not the CameraX Night extension's multi-frame still-photo fusion. Device support and visible improvement must be verified on physical hardware.
 - A source audit found the previous Zebra UI referenced its state and callback without declaring them in the shared App parameter list. The shared UI API has now been repaired and explicitly declares the Zebra and Low Light Boost state/callbacks.
+
+
+## Shared luma sampling and UI contract repair
+
+- Histogram, focus peaking and zebra now use one Android helper to sample the Y plane over ImageProxy.cropRect. It respects rowStride, pixelStride, ByteBuffer position/limit and uses long arithmetic for byte offsets; invalid plane/crop metadata yields an empty sample set rather than an out-of-bounds read.
+- The previous Zebra patch had added the rendering references but omitted the corresponding state/callback parameters from the shared Compose App signature. Those parameters are now explicitly declared, alongside the low-light boost controls.
+- CameraX low-light boost future completions are guarded by a monotonically increasing request id so a stale failure from a rapid toggle cannot overwrite a newer state. The torch-off request is awaited before enabling boost, torch state is only updated after its future succeeds, and camera/lens disposal clears the capability and action state.
