@@ -159,7 +159,7 @@ private fun LumaCameraApplication() {
     var exposureIndex by remember { mutableStateOf(0) }
     var minExposureIndex by remember { mutableStateOf(0) }
     var maxExposureIndex by remember { mutableStateOf(0) }
-    var faceGuidance by remember { mutableStateOf("촬영 장면을 분석하고 있습니다.") }
+    var faceGuidance by remember { mutableStateOf("인물 모드에서만 얼굴을 분석합니다.") }
     var captureAspectRatio by remember { mutableStateOf("4:3") }
     var faceCenterX by remember { mutableStateOf(0.5) }
     var faceCenterY by remember { mutableStateOf(0.5) }
@@ -350,7 +350,7 @@ private fun LumaCameraApplication() {
         onShootingIntentChange = { intent ->
             shootingIntent = intent
             faceArea = 0.0
-            faceGuidance = if (intent == ShootingIntent.PORTRAIT) "인물 모드 · 얼굴 구도 분석" else "장면 분석 중"
+            faceGuidance = if (intent == ShootingIntent.PORTRAIT) "인물 모드 · 얼굴 구도 분석" else "${intent.label} 장면 분석 중"
         },
         captureAspectRatio = captureAspectRatio,
         onCaptureAspectRatioChange = { captureAspectRatio = it },
@@ -444,7 +444,7 @@ private fun LumaCameraApplication() {
                         faceCenterX = x; faceCenterY = y; faceArea = area
                         faceGuidance = "얼굴 피사체 감지 · 구도 분석 중"
                     },
-                    onFaceLost = { faceArea = 0.0; faceGuidance = "사람 얼굴을 찾는 중입니다." }
+                    onFaceLost = { faceArea = 0.0; faceGuidance = "인물 모드에서 얼굴을 분석합니다." }
                 )
             } else {
                 Box(Modifier.fillMaxSize().background(Color(0xFF101419)), contentAlignment = Alignment.Center) {
@@ -516,7 +516,7 @@ private fun CameraPreview(
     }
     val imageLabeler = remember(lensFacing) { ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS) }
 
-    DisposableEffect(lifecycleOwner, cameraProviderFuture, previewView, detector, imageLabeler, lensFacing) {
+    DisposableEffect(lifecycleOwner, cameraProviderFuture, previewView, detector, imageLabeler, lensFacing, captureAspectRatio) {
         var imageCapture: ImageCapture? = null
         var imageAnalysis: ImageAnalysis? = null
         var boundProvider: ProcessCameraProvider? = null
@@ -604,8 +604,7 @@ private fun CameraPreview(
                                 }
                             }
                             val portraitMode = currentShootingIntent == ShootingIntent.PORTRAIT
-                            val faceTask = if (portraitMode) detector.process(input) else Tasks.forResult(emptyList())
-                            if (!portraitMode) mainExecutor.execute { if (!isDisposed) onFaceLost() }
+                            val faceTask = if (portraitMode) detector.process(input) else Tasks.forResult(emptyList<com.google.mlkit.vision.face.Face>())
                             val now = SystemClock.elapsedRealtime()
                             val shouldLabelScene = now - lastSceneLabelTimestamp >= 1_000L
                             val labelTask = if (shouldLabelScene) {
@@ -616,7 +615,7 @@ private fun CameraPreview(
                             }
                             Tasks.whenAllComplete(faceTask, labelTask).addOnCompleteListener(mainExecutor) {
                                 if (!isDisposed) {
-                                    if (faceTask.isSuccessful) {
+                                    if (portraitMode && faceTask.isSuccessful) {
                                         val face = faceTask.result.maxByOrNull { it.boundingBox.width().toLong() * it.boundingBox.height().toLong() }
                                         if (face == null) {
                                             onFaceLost()
@@ -633,7 +632,7 @@ private fun CameraPreview(
                                             val area = (bounds.width().toDouble() * bounds.height().toDouble() / (width * height)).coerceIn(0.0, 1.0)
                                             onFaceDetected(centerX, centerY, area)
                                         }
-                                    } else {
+                                    } else if (portraitMode) {
                                         Log.w(TAG, "On-device face detection failed", faceTask.exception)
                                     }
                                     if (shouldLabelScene) {
