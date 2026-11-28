@@ -45,6 +45,12 @@ class SceneClassifierTest {
     }
 
     @Test
+    fun recognizesSceneKeywordsInsideDescriptiveLabels() {
+        assertEquals(ShootingIntent.LANDSCAPE, SceneClassifier.classify(listOf(SceneLabelInput("green plant", 0.86)))?.intent)
+        assertEquals(ShootingIntent.ARCHITECTURE, SceneClassifier.classify(listOf(SceneLabelInput("tall building", 0.87)))?.intent)
+    }
+
+    @Test
     fun ignoresUnsupportedGenericLabels() {
         assertNull(SceneClassifier.classify(listOf(SceneLabelInput("Object", 0.99))))
     }
