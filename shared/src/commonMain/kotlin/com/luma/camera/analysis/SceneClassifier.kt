@@ -52,7 +52,8 @@ object SceneClassifier {
             val matches = normalized
                 .filter { (text, confidence) ->
                     confidence >= 0.25 && words.any { word ->
-                        text == word || (word.contains(' ') && text.contains(word))
+                        text == word || text.split(' ').any { token -> token == word } ||
+                            (word.contains(' ') && text.contains(word))
                     }
                 }
                 .distinctBy { it.first }
