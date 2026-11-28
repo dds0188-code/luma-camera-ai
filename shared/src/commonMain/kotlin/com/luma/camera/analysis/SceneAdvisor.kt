@@ -17,7 +17,9 @@ data class SceneAdviceInput(
     val minZoomRatio: Float = 1f,
     val maxZoomRatio: Float = 1f,
     /** Display-relative pitch estimate from the rotation-vector sensor; guidance only. */
-    val cameraPitchDegrees: Double = 0.0
+    val cameraPitchDegrees: Double = 0.0,
+    /** Largest reliable non-face object box area; kept separate from portrait face area. */
+    val detectedObjectAreaRatio: Double = 0.0
 )
 
 data class SceneAdvice(
@@ -121,6 +123,17 @@ object SceneAdvisor {
             if (abs(ratio - currentZoom) >= 0.08f) {
                 val direction = if (ratio > currentZoom) "줌 인" else "줌 아웃"
                 recommendations += "현재 얼굴 크기 기준 추천 배율 ${"%.1f".format(ratio)}× · $direction"
+                return SceneAdvice(title, summary, ratio, recommendations)
+            }
+        }
+        // For other scene types, only use the separately supplied ML object box, never face area.
+        val objectArea = safe(input.detectedObjectAreaRatio, 0.0).coerceIn(0.0, 1.0)
+        if (input.intent != ShootingIntent.PORTRAIT && objectArea > 0.001 && maxZoom > minZoom + 0.01f) {
+            val targetObjectArea = 0.20
+            val ratio = (currentZoom * sqrt(targetObjectArea / objectArea).toFloat()).coerceIn(minZoom, maxZoom)
+            if (abs(ratio - currentZoom) >= 0.12f) {
+                val direction = if (ratio > currentZoom) "줌 인" else "줌 아웃"
+                recommendations += "감지된 피사체 크기 기준 추천 배율 ${"%.1f".format(ratio)}× · $direction"
                 return SceneAdvice(title, summary, ratio, recommendations)
             }
         }
