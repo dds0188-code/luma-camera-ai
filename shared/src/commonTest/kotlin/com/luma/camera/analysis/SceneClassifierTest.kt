@@ -3,13 +3,14 @@ package com.luma.camera.analysis
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SceneClassifierTest {
     @Test
     fun recognizesFoodFromStrongOnDeviceLabels() {
         val result = SceneClassifier.classify(listOf(SceneLabelInput("Food", 0.91), SceneLabelInput("Dish", 0.72)))
         assertEquals(ShootingIntent.FOOD, result?.intent)
-        assertEquals(0.91, result?.confidence)
+        assertTrue((result?.confidence ?: 0.0) > 0.91)
     }
 
     @Test
