@@ -68,4 +68,6 @@ dependencies {
     implementation("com.google.mlkit:face-detection:16.1.7")
     // Bundled 400+ category image labels: available offline without a first-run model download.
     implementation("com.google.mlkit:image-labeling:17.0.9")
+    // Bundled on-device object detector for live subject bounding boxes; no cloud API or token.
+    implementation("com.google.mlkit:object-detection:17.0.2")
 }
