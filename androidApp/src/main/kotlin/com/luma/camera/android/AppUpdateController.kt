@@ -130,9 +130,16 @@ internal fun AppUpdateController() {
             } finally {
                 connection.disconnect()
             }
-            val actual = MessageDigest.getInstance("SHA-256")
-                .digest(apk.readBytes())
-                .joinToString("") { "%02x".format(it) }
+            val sha256 = MessageDigest.getInstance("SHA-256")
+            apk.inputStream().buffered().use { input ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    sha256.update(buffer, 0, count)
+                }
+            }
+            val actual = sha256.digest().joinToString("") { "%02x".format(it) }
             if (!actual.equals(info.sha256, ignoreCase = true)) {
                 apk.delete()
                 throw SecurityException("다운로드 파일 검증에 실패했습니다.")
