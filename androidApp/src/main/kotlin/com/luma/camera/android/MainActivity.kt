@@ -17,9 +17,13 @@ import android.os.Looper
 import android.os.SystemClock
 import android.provider.MediaStore
 import android.util.Log
+import android.util.Rational
 import android.view.MotionEvent
 import android.view.Surface
 import androidx.activity.ComponentActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -97,7 +101,21 @@ private const val TAG = "LumaCamera"
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableImmersiveCameraUi()
         setContent { LumaCameraApplication() }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) enableImmersiveCameraUi()
+    }
+
+    private fun enableImmersiveCameraUi() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
     }
 }
 
@@ -141,7 +159,8 @@ private fun LumaCameraApplication() {
     var exposureIndex by remember { mutableStateOf(0) }
     var minExposureIndex by remember { mutableStateOf(0) }
     var maxExposureIndex by remember { mutableStateOf(0) }
-    var faceGuidance by remember { mutableStateOf("사람 얼굴을 찾는 중입니다.") }
+    var faceGuidance by remember { mutableStateOf("촬영 장면을 분석하고 있습니다.") }
+    var captureAspectRatio by remember { mutableStateOf("4:3") }
     var faceCenterX by remember { mutableStateOf(0.5) }
     var faceCenterY by remember { mutableStateOf(0.5) }
     var faceArea by remember { mutableStateOf(0.0) }
@@ -220,7 +239,7 @@ private fun LumaCameraApplication() {
     val compositionHint = composition.suggestions.firstOrNull() ?: "현재 구도를 유지하며 촬영해 보세요."
     val sceneAdvice = SceneAdvisor.advise(
         SceneAdviceInput(
-            intent = recognizedShootingIntent ?: shootingIntent,
+            intent = shootingIntent,
             subjectCenterX = faceCenterX,
             subjectCenterY = faceCenterY,
             subjectAreaRatio = faceArea,
@@ -328,7 +347,13 @@ private fun LumaCameraApplication() {
         horizonTiltDegrees = horizonTilt,
         compositionGuidance = guidance,
         shootingIntent = shootingIntent,
-        onShootingIntentChange = { shootingIntent = it },
+        onShootingIntentChange = { intent ->
+            shootingIntent = intent
+            faceArea = 0.0
+            faceGuidance = if (intent == ShootingIntent.PORTRAIT) "인물 모드 · 얼굴 구도 분석" else "장면 분석 중"
+        },
+        captureAspectRatio = captureAspectRatio,
+        onCaptureAspectRatioChange = { captureAspectRatio = it },
         adviceSummary = sceneAdvice.summary,
         adviceLines = sceneAdvice.recommendations,
         suggestedZoomRatio = sceneAdvice.suggestedZoomRatio,
@@ -344,6 +369,8 @@ private fun LumaCameraApplication() {
         cameraPreview = {
             if (hasCameraPermission) {
                 CameraPreview(
+                    shootingIntent = shootingIntent,
+                    captureAspectRatio = captureAspectRatio,
                     onCaptureActionAvailable = { captureAction = it },
                     onCaptureStatus = { captureStatus = it },
                     onZoomActionAvailable = { zoomAction = it },
@@ -431,6 +458,8 @@ private fun LumaCameraApplication() {
 @OptIn(ExperimentalCamera2Interop::class)
 @Composable
 private fun CameraPreview(
+    shootingIntent: ShootingIntent,
+    captureAspectRatio: String,
     onCaptureActionAvailable: (((Int, Int) -> Unit)?) -> Unit,
     onCaptureStatus: (String) -> Unit,
     onZoomActionAvailable: (((Float) -> Unit)?) -> Unit,
@@ -466,6 +495,7 @@ private fun CameraPreview(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val currentShootingIntent by rememberUpdatedState(shootingIntent)
     val currentFocusPeakingEnabled by rememberUpdatedState(focusPeakingEnabled)
     val currentZebraExposureEnabled by rememberUpdatedState(zebraExposureEnabled)
     val mainExecutor = remember(context) { ContextCompat.getMainExecutor(context) }
@@ -507,10 +537,15 @@ private fun CameraPreview(
                 val provider = cameraProviderFuture.get()
                 boundProvider = provider
                 val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
+                val ratioParts = captureAspectRatio.split(":").mapNotNull { it.toIntOrNull() }
                 val capture = ImageCapture.Builder()
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                     .setTargetRotation(previewView.display?.rotation ?: Surface.ROTATION_0)
-                    .build()
+                    .build().also { useCase ->
+                        if (ratioParts.size == 2 && ratioParts.all { it > 0 }) {
+                            useCase.setCropAspectRatio(Rational(ratioParts[0], ratioParts[1]))
+                        }
+                    }
                 val analysis = ImageAnalysis.Builder()
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
@@ -568,7 +603,9 @@ private fun CameraPreview(
                                     mainExecutor.execute { if (!isDisposed && currentZebraExposureEnabled) onZebraMarks(marks) }
                                 }
                             }
-                            val faceTask = detector.process(input)
+                            val portraitMode = currentShootingIntent == ShootingIntent.PORTRAIT
+                            val faceTask = if (portraitMode) detector.process(input) else Tasks.forResult(emptyList())
+                            if (!portraitMode) mainExecutor.execute { if (!isDisposed) onFaceLost() }
                             val now = SystemClock.elapsedRealtime()
                             val shouldLabelScene = now - lastSceneLabelTimestamp >= 1_000L
                             val labelTask = if (shouldLabelScene) {
