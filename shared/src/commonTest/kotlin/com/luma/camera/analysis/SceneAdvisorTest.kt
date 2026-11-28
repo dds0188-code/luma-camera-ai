@@ -8,18 +8,18 @@ import kotlin.test.assertTrue
 class SceneAdvisorTest {
     @Test fun portraitSuggestsZoomFromDetectedFaceArea() {
         val advice = SceneAdvisor.advise(SceneAdviceInput(ShootingIntent.PORTRAIT, subjectAreaRatio = 0.04, currentZoomRatio = 1f, minZoomRatio = 0.5f, maxZoomRatio = 4f))
-        assertEquals(2f, advice.suggestedZoomRatio)
+        assertEquals(2f, advice.suggestedZoomRatio ?: Float.NaN)
         assertTrue(advice.recommendations.any { it.contains("추천 배율") })
     }
 
     @Test fun zoomRecommendationNeverExceedsCameraCapability() {
         val advice = SceneAdvisor.advise(SceneAdviceInput(ShootingIntent.PORTRAIT, subjectAreaRatio = 0.01, currentZoomRatio = 1f, minZoomRatio = 0.5f, maxZoomRatio = 1.5f))
-        assertEquals(1.5f, advice.suggestedZoomRatio)
+        assertEquals(1.5f, advice.suggestedZoomRatio ?: Float.NaN)
     }
 
     @Test fun zoomRecommendationRespectsDeviceMinimumBelowOneX() {
         val advice = SceneAdvisor.advise(SceneAdviceInput(ShootingIntent.PORTRAIT, subjectAreaRatio = 0.8, currentZoomRatio = 1f, minZoomRatio = 0.5f, maxZoomRatio = 4f))
-        assertEquals(0.5f, advice.suggestedZoomRatio)
+        assertEquals(0.5f, advice.suggestedZoomRatio ?: Float.NaN)
     }
 
     @Test fun landscapeDoesNotInventFaceBasedZoom() {
@@ -44,7 +44,7 @@ class SceneAdvisorTest {
         val advice = SceneAdvisor.advise(SceneAdviceInput(ShootingIntent.PORTRAIT, subjectAreaRatio = 0.02, cameraPitchDegrees = 12.0, currentZoomRatio = 1f, maxZoomRatio = 4f))
         assertTrue(advice.recommendations.any { it.contains("아래를 향하고") })
         assertTrue(advice.recommendations.any { it.contains("얼굴이 작게") })
-        assertEquals(2.83f, advice.suggestedZoomRatio, 0.02f)
+        assertEquals(2.83f, advice.suggestedZoomRatio ?: Float.NaN, 0.02f)
     }
 
     @Test fun foodAdviceAdaptsAngleHintToPitch() {
