@@ -181,7 +181,6 @@ internal fun AppUpdateController() {
                 },
                 enabled = !busy
             ) { Text("업데이트 확인") }
-            Text(status, modifier = Modifier.padding(top = 12.dp), style = MaterialTheme.typography.labelSmall)
         }
         val available = update
         if (available != null) {
@@ -192,6 +191,7 @@ internal fun AppUpdateController() {
                 ) {
                     Text("Luma Camera AI v${available.versionName} 업데이트", style = MaterialTheme.typography.titleSmall)
                     Text("새 버전을 내려받고 파일 무결성을 확인한 뒤 Android 설치 화면을 엽니다.", style = MaterialTheme.typography.bodySmall)
+                    Text(status, style = MaterialTheme.typography.labelSmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             enabled = !busy && downloadedApk == null,
