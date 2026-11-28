@@ -29,6 +29,31 @@ class SceneAdvisorTest {
         assertTrue(advice.recommendations.any { it.contains("전경") })
     }
 
+    @Test fun nonPortraitObjectBoxCanSuggestZoomWithoutFaceData() {
+        val advice = SceneAdvisor.advise(SceneAdviceInput(
+            intent = ShootingIntent.LANDSCAPE,
+            subjectAreaRatio = 0.0,
+            detectedObjectAreaRatio = 0.05,
+            currentZoomRatio = 1f,
+            minZoomRatio = 1f,
+            maxZoomRatio = 4f
+        ))
+        assertEquals(2f, advice.suggestedZoomRatio ?: Float.NaN)
+        assertTrue(advice.recommendations.any { it.contains("피사체 크기 기준 추천 배율") })
+    }
+
+    @Test fun nonPortraitZoomDoesNotReusePortraitFaceArea() {
+        val advice = SceneAdvisor.advise(SceneAdviceInput(
+            intent = ShootingIntent.FOOD,
+            subjectAreaRatio = 0.01,
+            detectedObjectAreaRatio = 0.0,
+            currentZoomRatio = 1f,
+            minZoomRatio = 1f,
+            maxZoomRatio = 4f
+        ))
+        assertNull(advice.suggestedZoomRatio)
+    }
+
     @Test fun unsupportedZoomRangeDoesNotOfferZoomAction() {
         val advice = SceneAdvisor.advise(SceneAdviceInput(ShootingIntent.FOOD, subjectAreaRatio = 0.05, currentZoomRatio = 1f, maxZoomRatio = 1f))
         assertNull(advice.suggestedZoomRatio)
