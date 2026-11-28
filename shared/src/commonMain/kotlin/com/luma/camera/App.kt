@@ -25,6 +25,10 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -116,8 +120,12 @@ fun App(
     captureBurstCount: Int = 1,
     onCaptureBurstCountChange: (Int) -> Unit = {},
     gridMode: String = "삼분할",
-    onGridModeChange: (String) -> Unit = {}
+    onGridModeChange: (String) -> Unit = {},
+    captureAspectRatio: String = "4:3",
+    onCaptureAspectRatioChange: (String) -> Unit = {}
 ) {
+    var activeCategory by remember { mutableStateOf("AI 가이드") }
+    val categories = listOf("AI 가이드", "렌즈·노출", "촬영 설정", "사진 결과")
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = Background) {
             Column(
@@ -176,6 +184,7 @@ fun App(
                     }
                 }
 
+                if (activeCategory == "촬영 설정") {
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     verticalAlignment = Alignment.CenterVertically,
@@ -268,6 +277,7 @@ fun App(
                         ) { Text(mode, style = MaterialTheme.typography.labelSmall) }
                     }
                 }
+                }
                 Box(
                     modifier = Modifier.fillMaxWidth().weight(1.18f)
                         .clip(RoundedCornerShape(25.dp)).background(PanelRaised)
@@ -326,11 +336,30 @@ fun App(
                         style = MaterialTheme.typography.labelMedium
                     )
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    categories.forEach { category ->
+                        val selected = activeCategory == category
+                        Button(
+                            onClick = { activeCategory = category },
+                            modifier = Modifier.height(38.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 15.dp, vertical = 0.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selected) Accent else Panel,
+                                contentColor = if (selected) Color(0xFF10170B) else Muted
+                            ),
+                            shape = CircleShape
+                        ) { Text(category, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold) }
+                    }
+                }
 
                 Column(
                     modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(9.dp)
                 ) {
+                    if (activeCategory == "AI 가이드") {
                     Row(
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Panel).padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -375,6 +404,9 @@ fun App(
                         }
                     }
 
+                    }
+
+                    if (activeCategory == "렌즈·노출") {
                     Column(
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Panel).padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -561,26 +593,12 @@ fun App(
                                 shape = CircleShape
                             ) { Text(if (torchEnabled) "켜짐" else "끔") }
                         }
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("촬영 준비 완료", color = TextMain, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                                Text(captureStatus, color = Muted, style = MaterialTheme.typography.labelSmall)
-                            }
-                            Button(
-                                onClick = onCaptureClick,
-                                modifier = Modifier.size(68.dp),
-                                shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF10170B)),
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-                            ) {
-                                Box(Modifier.size(50.dp).border(3.dp, Color(0xFF10170B), CircleShape).padding(5.dp).background(Color(0xFF10170B), CircleShape))
-                            }
-                        }
+
                     }
 
+                    }
+
+                    if (activeCategory == "사진 결과") {
                     if (cameraCapabilitySummary.isNotBlank()) {
                         InfoCard("기기 카메라 정보", cameraCapabilitySummary)
                     }
@@ -595,8 +613,39 @@ fun App(
                             Text("디테일 점수는 초점 정확도를 직접 측정한 값이 아닌 참고 지표입니다.", color = Muted, style = MaterialTheme.typography.labelSmall)
                         }
                     }
+                    }
                     Text("사진과 AI 분석은 기본적으로 기기 안에서 처리됩니다.", color = Muted, style = MaterialTheme.typography.labelSmall)
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    listOf("4:3", "3:4", "1:1", "9:16").forEach { ratio ->
+                        val selected = captureAspectRatio == ratio
+                        Button(
+                            onClick = { onCaptureAspectRatioChange(ratio) },
+                            modifier = Modifier.weight(1f).height(34.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 2.dp, vertical = 0.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selected) PanelRaised else Panel,
+                                contentColor = if (selected) Accent else Muted
+                            ),
+                            shape = CircleShape
+                        ) { Text(ratio, style = MaterialTheme.typography.labelSmall) }
+                    }
+                    Spacer(Modifier.size(5.dp))
+                    Button(
+                        onClick = onCaptureClick,
+                        modifier = Modifier.size(64.dp),
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color(0xFF10170B)),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                    ) {
+                        Box(Modifier.size(48.dp).border(3.dp, Color(0xFF10170B), CircleShape).padding(5.dp).background(Color(0xFF10170B), CircleShape))
+                    }
+                }
+                Text(captureStatus, modifier = Modifier.fillMaxWidth(), color = Muted, style = MaterialTheme.typography.labelSmall)
             }
         }
     }
@@ -642,6 +691,6 @@ private fun PreviewPlaceholder() {
     ) {
         Text("카메라 미리보기", color = Color.White, style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
-        Text("Windows 카메라 연동 준비 중", color = Muted)
+        Text("카메라 연결을 기다리고 있습니다.", color = Muted)
     }
 }
