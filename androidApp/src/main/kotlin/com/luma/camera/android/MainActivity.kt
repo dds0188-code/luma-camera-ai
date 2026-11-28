@@ -169,6 +169,7 @@ private fun LumaCameraApplication() {
     var faceCenterY by remember { mutableStateOf(0.5) }
     var faceArea by remember { mutableStateOf(0.0) }
     var detectedSubjectGuidance by remember { mutableStateOf("") }
+    var detectedSubjectAreaRatio by remember { mutableStateOf(0.0) }
     var horizonTilt by remember { mutableStateOf(0f) }
     var cameraPitchDegrees by remember { mutableStateOf(0f) }
     var shootingIntent by remember { mutableStateOf(ShootingIntent.PORTRAIT) }
@@ -252,7 +253,8 @@ private fun LumaCameraApplication() {
             currentZoomRatio = zoomRatio,
             minZoomRatio = minZoomRatio,
             maxZoomRatio = maxZoomRatio,
-            cameraPitchDegrees = cameraPitchDegrees.toDouble()
+            cameraPitchDegrees = cameraPitchDegrees.toDouble(),
+            detectedObjectAreaRatio = detectedSubjectAreaRatio
         )
     )
     val guidance = if (faceArea <= 0.0) listOf(faceGuidance, detectedSubjectGuidance).filter { it.isNotBlank() && it != "인물 모드에서만 얼굴을 분석합니다." }.joinToString(" · ").ifBlank { faceGuidance } else {
@@ -357,6 +359,7 @@ private fun LumaCameraApplication() {
             shootingIntent = intent
             faceArea = 0.0
             detectedSubjectGuidance = ""
+            detectedSubjectAreaRatio = 0.0
             faceGuidance = if (intent == ShootingIntent.PORTRAIT) "인물 모드 · 얼굴 구도 분석" else "${intent.label} 피사체 위치 분석 중"
         },
         captureAspectRatio = captureAspectRatio,
@@ -454,6 +457,7 @@ private fun LumaCameraApplication() {
                     onFaceLost = { faceArea = 0.0; faceGuidance = "인물 모드에서 얼굴을 분석합니다." },
                     onDetectedSubjects = { subjects ->
                         val result = SubjectCompositionAnalyzer.analyze(subjects)
+                        detectedSubjectAreaRatio = result?.areaRatio ?: 0.0
                         detectedSubjectGuidance = result?.let { (it.label?.let { label -> "$label · " } ?: "") + it.guidance }.orEmpty()
                     }
                 )
