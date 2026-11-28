@@ -26,6 +26,10 @@
 - [x] 공통 한국어 다크 UI 초안
 - [x] Android 앱 진입점 및 카메라 권한 선언
 - [x] Android APK 빌드 작업 정의
+- [x] 앱 내 GitHub 최신 릴리스 확인 및 버전 비교
+- [x] APK 다운로드 후 SHA-256 무결성 확인
+- [x] Android 패키지 설치 화면으로 업데이트 연결
+- [x] 고정 서명키 기반 Release APK 배포 워크플로 준비
 - [x] Android CameraX 전면/후면 카메라 전환 및 실시간 미리보기
 - [x] 정규화된 피사체 위치/크기와 수평 기울기를 이용한 기본 구도 점수 엔진 및 단위 테스트
 - [x] Android 사진 촬영/MediaStore 저장 기능
@@ -97,3 +101,12 @@
 - 줌 범위는 고정된 1×~10× 같은 숫자를 강제하지 않고, 현재 활성 카메라의 CameraX `ZoomState.minZoomRatio` / `maxZoomRatio` 값을 읽어 표시하고 적용합니다. 기기·렌즈별 지원 범위가 다르면 해당 값을 그대로 사용합니다.
 - 줌 슬라이더는 최소 배율부터 최대 배율까지 전체 범위를 사용합니다. AI 인물 프레이밍 추천도 같은 하드웨어 범위로 제한하므로 지원하지 않는 배율을 요청하지 않습니다.
 - GitHub Actions는 Android 공통 로직 테스트와 Debug APK 빌드만 수행하며, 성공 시 APK를 `luma-camera-ai-android-debug-apk` 아티팩트로 업로드합니다. Windows 빌드는 제거했습니다.
+
+## 앱 내 업데이트 시스템 (v0.4.0)
+- 앱 실행 시 GitHub Releases의 최신 버전을 확인하고, 현재 설치 버전보다 새 버전이 있을 때 앱 화면에 업데이트 카드를 표시합니다.
+- APK를 앱 캐시에 내려받은 뒤 GitHub Release asset의 SHA-256 digest와 실제 파일 해시를 비교합니다. 검증에 실패한 APK는 삭제하고 설치하지 않습니다.
+- 검증이 끝나면 Android 패키지 설치 화면을 엽니다. Android 보안 정책상 사용자의 설치 확인은 필요하며, 출처를 알 수 없는 앱 설치 권한도 최초 1회 허용해야 할 수 있습니다. 앱이 사용자 몰래 설치를 완료할 수는 없습니다.
+- 배포 파이프라인은 `v*` 태그에서 고정 업로드 키로 서명한 APK를 GitHub Release에 `luma-camera-ai.apk` 이름으로 게시합니다. 앱은 이 Release asset을 업데이트 대상으로 사용합니다.
+- 업데이트를 활성화하려면 저장소 Settings → Secrets and variables → Actions에 `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` 네 가지 비밀값을 등록해야 합니다. 키스토어는 최초 한 번 생성하고 안전하게 백업해야 하며, 잃어버리면 기존 앱을 같은 서명으로 업데이트할 수 없습니다.
+- **서명키 전환 주의:** 이전 0.3.0 Debug APK는 GitHub 러너의 임시 Debug 키로 서명되었으므로, 첫 고정키 Release APK로 전환할 때는 Android 서명 일치가 보장되지 않습니다. 고정키 Release로 한 번 설치한 이후부터 앱 내 업데이트가 같은 서명으로 이어집니다. 기존 설치본과 데이터 보존 여부는 실제 기기에서 확인해야 합니다.
+- 자동 업데이트는 무인/강제 설치가 아니라, 새 버전 확인 → 검증된 다운로드 → Android 설치 확인 화면으로 이어지는 안전한 업데이트 방식입니다.
