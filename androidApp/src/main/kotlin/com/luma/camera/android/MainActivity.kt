@@ -68,6 +68,8 @@ import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.label.ImageLabel
 import com.google.mlkit.vision.label.ImageLabeling
 import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
+import com.google.mlkit.vision.objects.ObjectDetection
+import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.luma.camera.App
 import com.luma.camera.analysis.CaptureTimerOptions
 import com.luma.camera.analysis.CaptureBurstOptions
@@ -87,6 +89,8 @@ import com.luma.camera.analysis.SceneAdviceInput
 import com.luma.camera.analysis.SceneAdvisor
 import com.luma.camera.analysis.SceneClassifier
 import com.luma.camera.analysis.SceneLabelInput
+import com.luma.camera.analysis.DetectedSubjectInput
+import com.luma.camera.analysis.SubjectCompositionAnalyzer
 import com.luma.camera.analysis.ShootingIntent
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -164,6 +168,7 @@ private fun LumaCameraApplication() {
     var faceCenterX by remember { mutableStateOf(0.5) }
     var faceCenterY by remember { mutableStateOf(0.5) }
     var faceArea by remember { mutableStateOf(0.0) }
+    var detectedSubjectGuidance by remember { mutableStateOf("") }
     var horizonTilt by remember { mutableStateOf(0f) }
     var cameraPitchDegrees by remember { mutableStateOf(0f) }
     var shootingIntent by remember { mutableStateOf(ShootingIntent.PORTRAIT) }
@@ -250,7 +255,7 @@ private fun LumaCameraApplication() {
             cameraPitchDegrees = cameraPitchDegrees.toDouble()
         )
     )
-    val guidance = if (faceArea <= 0.0) faceGuidance else {
+    val guidance = if (faceArea <= 0.0) listOf(faceGuidance, detectedSubjectGuidance).filter { it.isNotBlank() && it != "인물 모드에서만 얼굴을 분석합니다." }.joinToString(" · ").ifBlank { faceGuidance } else {
         val framingHint = when {
             faceArea < 0.025 -> "피사체가 작아요 · 한 단계 가까이 또는 줌 인"
             faceArea > 0.22 -> "얼굴이 화면을 많이 차지해요 · 한 걸음 뒤로 또는 줌 아웃"
@@ -351,7 +356,8 @@ private fun LumaCameraApplication() {
         onShootingIntentChange = { intent ->
             shootingIntent = intent
             faceArea = 0.0
-            faceGuidance = if (intent == ShootingIntent.PORTRAIT) "인물 모드 · 얼굴 구도 분석" else "${intent.label} 장면 분석 중"
+            detectedSubjectGuidance = ""
+            faceGuidance = if (intent == ShootingIntent.PORTRAIT) "인물 모드 · 얼굴 구도 분석" else "${intent.label} 피사체 위치 분석 중"
         },
         captureAspectRatio = captureAspectRatio,
         onCaptureAspectRatioChange = { captureAspectRatio = it },
@@ -445,7 +451,11 @@ private fun LumaCameraApplication() {
                         faceCenterX = x; faceCenterY = y; faceArea = area
                         faceGuidance = "얼굴 피사체 감지 · 구도 분석 중"
                     },
-                    onFaceLost = { faceArea = 0.0; faceGuidance = "인물 모드에서 얼굴을 분석합니다." }
+                    onFaceLost = { faceArea = 0.0; faceGuidance = "인물 모드에서 얼굴을 분석합니다." },
+                    onDetectedSubjects = { subjects ->
+                        val result = SubjectCompositionAnalyzer.analyze(subjects)
+                        detectedSubjectGuidance = result?.let { (it.label?.let { label -> "$label · " } ?: "") + it.guidance }.orEmpty()
+                    }
                 )
             } else {
                 Box(Modifier.fillMaxSize().background(Color(0xFF101419)), contentAlignment = Alignment.Center) {
@@ -494,7 +504,8 @@ private fun CameraPreview(
     onCameraCapabilitySummary: (String) -> Unit,
     onSceneLabels: (List<SceneLabelInput>) -> Unit,
     onFaceDetected: (Double, Double, Double) -> Unit,
-    onFaceLost: () -> Unit
+    onFaceLost: () -> Unit,
+    onDetectedSubjects: (List<DetectedSubjectInput>) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -518,8 +529,16 @@ private fun CameraPreview(
         )
     }
     val imageLabeler = remember(lensFacing) { ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS) }
+    val objectDetector = remember(lensFacing) {
+        val options = ObjectDetectorOptions.Builder()
+            .setDetectorMode(ObjectDetectorOptions.STREAM_MODE)
+            .enableMultipleObjects()
+            .enableClassification()
+            .build()
+        ObjectDetection.getClient(options)
+    }
 
-    DisposableEffect(lifecycleOwner, cameraProviderFuture, previewView, detector, imageLabeler, lensFacing, captureAspectRatio) {
+    DisposableEffect(lifecycleOwner, cameraProviderFuture, previewView, detector, imageLabeler, objectDetector, lensFacing, captureAspectRatio) {
         var imageCapture: ImageCapture? = null
         var imageAnalysis: ImageAnalysis? = null
         var boundProvider: ProcessCameraProvider? = null
@@ -531,6 +550,7 @@ private fun CameraPreview(
         val analysisBusy = AtomicBoolean(false)
         val analysisExecutor = Executors.newSingleThreadExecutor()
         var lastSceneLabelTimestamp = 0L
+        var lastObjectDetectionTimestamp = 0L
         var lastExposureMeterTimestamp = 0L
         var lastFocusPeakingTimestamp = 0L
         var lastZebraTimestamp = 0L
@@ -616,7 +636,14 @@ private fun CameraPreview(
                             } else {
                                 Tasks.forResult(emptyList<ImageLabel>())
                             }
-                            Tasks.whenAllComplete(faceTask, labelTask).addOnCompleteListener(mainExecutor) {
+                            val shouldDetectObjects = !portraitMode && now - lastObjectDetectionTimestamp >= 500L
+                            val objectTask = if (shouldDetectObjects) {
+                                lastObjectDetectionTimestamp = now
+                                objectDetector.process(input)
+                            } else {
+                                Tasks.forResult(emptyList<com.google.mlkit.vision.objects.DetectedObject>())
+                            }
+                            Tasks.whenAllComplete(faceTask, labelTask, objectTask).addOnCompleteListener(mainExecutor) {
                                 if (!isDisposed) {
                                     if (portraitMode && faceTask.isSuccessful) {
                                         val face = faceTask.result.maxByOrNull { it.boundingBox.width().toLong() * it.boundingBox.height().toLong() }
@@ -643,6 +670,34 @@ private fun CameraPreview(
                                             onSceneLabels(labelTask.result.map { SceneLabelInput(it.text, it.confidence.toDouble()) })
                                         } else {
                                             Log.w(TAG, "On-device scene labeling failed", labelTask.exception)
+                                        }
+                                    }
+                                    if (shouldDetectObjects) {
+                                        if (objectTask.isSuccessful) {
+                                            val rotation = proxy.imageInfo.rotationDegrees
+                                            val rotatedWidth = if (rotation == 90 || rotation == 270) mediaImage.height else mediaImage.width
+                                            val rotatedHeight = if (rotation == 90 || rotation == 270) mediaImage.width else mediaImage.height
+                                            val frameWidth = rotatedWidth.toDouble().coerceAtLeast(1.0)
+                                            val frameHeight = rotatedHeight.toDouble().coerceAtLeast(1.0)
+                                            val subjects = objectTask.result.mapNotNull { detected ->
+                                                val bounds = detected.boundingBox
+                                                val rawLeft = (bounds.left / frameWidth).coerceIn(0.0, 1.0)
+                                                val rawRight = (bounds.right / frameWidth).coerceIn(0.0, 1.0)
+                                                val left = if (lensFacing == CameraSelector.LENS_FACING_FRONT) 1.0 - rawRight else rawLeft
+                                                val right = if (lensFacing == CameraSelector.LENS_FACING_FRONT) 1.0 - rawLeft else rawRight
+                                                val bestLabel = detected.labels.maxByOrNull { it.confidence }
+                                                DetectedSubjectInput(
+                                                    left = left,
+                                                    top = (bounds.top / frameHeight).coerceIn(0.0, 1.0),
+                                                    right = right,
+                                                    bottom = (bounds.bottom / frameHeight).coerceIn(0.0, 1.0),
+                                                    label = bestLabel?.text,
+                                                    confidence = bestLabel?.confidence?.toDouble() ?: 0.65
+                                                )
+                                            }
+                                            onDetectedSubjects(subjects)
+                                        } else {
+                                            Log.w(TAG, "On-device object detection failed", objectTask.exception)
                                         }
                                     }
                                 }
@@ -1016,6 +1071,7 @@ private fun CameraPreview(
             analysisExecutor.shutdown()
             detector.close()
             imageLabeler.close()
+            objectDetector.close()
         }
     }
     AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
