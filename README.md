@@ -110,3 +110,12 @@
 - 업데이트를 활성화하려면 저장소 Settings → Secrets and variables → Actions에 `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` 네 가지 비밀값을 등록해야 합니다. 키스토어는 최초 한 번 생성하고 안전하게 백업해야 하며, 잃어버리면 기존 앱을 같은 서명으로 업데이트할 수 없습니다.
 - **서명키 전환 주의:** 이전 0.3.0 Debug APK는 GitHub 러너의 임시 Debug 키로 서명되었으므로, 첫 고정키 Release APK로 전환할 때는 Android 서명 일치가 보장되지 않습니다. 고정키 Release로 한 번 설치한 이후부터 앱 내 업데이트가 같은 서명으로 이어집니다. 기존 설치본과 데이터 보존 여부는 실제 기기에서 확인해야 합니다.
 - 자동 업데이트는 무인/강제 설치가 아니라, 새 버전 확인 → 검증된 다운로드 → Android 설치 확인 화면으로 이어지는 안전한 업데이트 방식입니다.
+
+### Live subject framing (offline)
+
+- Portrait mode uses the bundled face detector for face position and face-scale guidance.
+- Landscape, architecture, and food modes use the bundled ML Kit stream-mode object detector to estimate subject bounding boxes and labels on-device.
+- Subject boxes are normalized against the rotated camera frame and mirrored for the front camera before composition analysis.
+- The shared subject-composition analyzer recommends safer edge margins, rule-of-thirds placement, and framing scale based on the largest reliable detected subject.
+- Detection is throttled to roughly twice per second in non-portrait modes to limit camera-analysis load. No cloud inference, API token, or network connection is required.
+- These are geometric framing hints from object boxes, not a learned aesthetic-quality score or guaranteed semantic identification.
