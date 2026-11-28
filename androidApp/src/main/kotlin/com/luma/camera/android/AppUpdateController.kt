@@ -94,7 +94,7 @@ internal fun AppUpdateController() {
                                 downloadUrl = asset.getString("browser_download_url"),
                                 sha256 = digest.removePrefix("sha256:").lowercase()
                             ),
-                            "새 버전 v$tag를 찾았습니다."
+                            "새 버전 v${tag}를 찾았습니다."
                         )
                     }
                 } finally {
