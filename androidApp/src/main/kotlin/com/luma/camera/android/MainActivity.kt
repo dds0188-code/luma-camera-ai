@@ -263,6 +263,7 @@ private fun LumaCameraApplication() {
         "$framingHint  ·  $tiltHint  ·  $compositionHint"
     }
 
+    Box(Modifier.fillMaxSize()) {
     App(
         isFrontCamera = lensFacing == CameraSelector.LENS_FACING_FRONT,
         onToggleCamera = { lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK },
@@ -453,6 +454,8 @@ private fun LumaCameraApplication() {
             }
         }
     )
+        Box(Modifier.align(Alignment.TopEnd)) { AppUpdateController() }
+    }
 }
 
 @OptIn(ExperimentalCamera2Interop::class)
