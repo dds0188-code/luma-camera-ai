@@ -1,7 +1,5 @@
 package com.luma.camera.analysis
 
-import kotlin.math.max
-
 data class SceneLabelInput(val text: String, val confidence: Double)
 
 data class SceneClassification(
