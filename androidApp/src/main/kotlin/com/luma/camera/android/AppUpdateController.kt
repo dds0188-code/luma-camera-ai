@@ -172,9 +172,15 @@ internal fun AppUpdateController() {
     Column(modifier = Modifier.padding(10.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(
-                onClick = { if (!busy) { update = null; downloadedApk = null; } },
+                onClick = {
+                    if (!busy) {
+                        update = null
+                        downloadedApk = null
+                        scope.launch { checkForUpdate() }
+                    }
+                },
                 enabled = !busy
-            ) { Text("업데이트") }
+            ) { Text("업데이트 확인") }
             Text(status, modifier = Modifier.padding(top = 12.dp), style = MaterialTheme.typography.labelSmall)
         }
         val available = update
