@@ -160,7 +160,7 @@ private fun LumaCameraApplication() {
     var minExposureIndex by remember { mutableStateOf(0) }
     var maxExposureIndex by remember { mutableStateOf(0) }
     var faceGuidance by remember { mutableStateOf("인물 모드에서만 얼굴을 분석합니다.") }
-    var captureAspectRatio by remember { mutableStateOf("4:3") }
+    var captureAspectRatio by remember { mutableStateOf("3:4") }
     var faceCenterX by remember { mutableStateOf(0.5) }
     var faceCenterY by remember { mutableStateOf(0.5) }
     var faceArea by remember { mutableStateOf(0.0) }
