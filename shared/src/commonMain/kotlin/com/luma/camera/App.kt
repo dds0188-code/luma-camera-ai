@@ -121,7 +121,7 @@ fun App(
     onCaptureBurstCountChange: (Int) -> Unit = {},
     gridMode: String = "삼분할",
     onGridModeChange: (String) -> Unit = {},
-    captureAspectRatio: String = "4:3",
+    captureAspectRatio: String = "3:4",
     onCaptureAspectRatioChange: (String) -> Unit = {}
 ) {
     var activeCategory by remember { mutableStateOf("AI 가이드") }
