@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -26,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -44,6 +46,7 @@ private data class CameraAppUpdate(
 @Composable
 internal fun AppUpdateController() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var update by remember { mutableStateOf<CameraAppUpdate?>(null) }
     var status by remember { mutableStateOf("업데이트 확인 중…") }
     var busy by remember { mutableStateOf(false) }
@@ -185,13 +188,22 @@ internal fun AppUpdateController() {
                     Text("새 버전을 내려받고 파일 무결성을 확인한 뒤 Android 설치 화면을 엽니다.", style = MaterialTheme.typography.bodySmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
-                            enabled = !busy,
+                            enabled = !busy && downloadedApk == null,
                             onClick = {
-                                busy = true
-                                status = "업데이트 다운로드 중…"
-                                // The UI callback launches the suspend work in the Compose scope below.
+                                scope.launch {
+                                    busy = true
+                                    status = "업데이트 다운로드 중…"
+                                    try {
+                                        downloadedApk = downloadUpdate(available)
+                                        status = "다운로드 및 SHA-256 검증 완료 · 설치를 진행할 수 있습니다."
+                                    } catch (error: Exception) {
+                                        status = error.message ?: "업데이트 다운로드에 실패했습니다."
+                                    } finally {
+                                        busy = false
+                                    }
+                                }
                             }
-                        ) { Text("다운로드") }
+                        ) { Text(if (busy) "처리 중…" else "다운로드") }
                         val ready = downloadedApk
                         if (ready != null) {
                             Button(onClick = { installDownloadedApk(ready) }) { Text("설치") }
